@@ -50,30 +50,31 @@ def store(db_path: str) -> TaskStore:
     return TaskStore(file_path=db_path)
 
 
-def test_stop_scheduler_stops_thread(speech: DummySpeech, store: TaskStore) -> None:
+
+def test_scheduler_starts_and_stops_cleanly(speech: DummySpeech, store: TaskStore) -> None:
     """
-    Test that the scheduler thread stops cleanly after calling stop().
-    Ensures no thread is left running after stop is called.
+    Ensure APScheduler starts and stops without errors and no duplicate threads.
     """
-    # Schedule a task and start the scheduler, then stop it and check the thread is stopped.
-    due = datetime.now() + timedelta(seconds=2)
-    task = make_task("StopTest", due)
+    task = make_task("CleanStartStop", datetime.now() + timedelta(seconds=1))
     store.add(task)
     sched = Scheduler(store=store, speech_callback=speech)
+    assert not sched.is_running, "Scheduler should not be running initially"
     sched.schedule_all()
     sched.start()
+    assert sched.is_running, "Scheduler did not start properly"
+    # Repeated start should not cause error or duplication
+    sched.start()
+    assert sched.is_running, "Scheduler became inactive after second start"
     sched.stop()
-    # Accessing protected member for test purposes; Scheduler does not expose thread status publicly.
-    thread = sched._thread  # type: ignore[attr-defined]
-    assert thread is None or not thread.is_alive(), "Scheduler thread did not stop properly"
+    assert not sched.is_running, "Scheduler did not stop properly"
 
 
-def test_scheduler_does_not_duplicate_running_thread(speech: DummySpeech, store: TaskStore) -> None:
+def test_scheduler_start_twice_no_error(speech: DummySpeech, store: TaskStore) -> None:
     """
-    Test that calling start() multiple times does not create duplicate threads.
-    Ensures only one scheduler thread runs at a time.
+    Ensure calling start() multiple times doesn't raise or duplicate scheduler.
     """
-    # Start the scheduler twice and ensure only one thread is created and stopped.
-    due = datetime.now() + timedelta(seconds=1)
-    task = make_task("ThreadSafe", due)
-    store.add(task)
+    sched = Scheduler(store=store, speech_callback=speech)
+    sched.start()
+    sched.start()  # Should be idempotent
+    assert sched.is_running, "Scheduler is not running after repeated starts"
+    sched.stop()

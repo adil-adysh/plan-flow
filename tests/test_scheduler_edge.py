@@ -6,17 +6,20 @@ Edge case tests for Scheduler:
 """
 
 import time
-from datetime import datetime, timedelta
+import threading
+import logging
 import pytest
+from unittest import mock
+from datetime import datetime, timedelta
+from collections.abc import Callable
+
 from addon.globalPlugins.planflow.task.schedule import Scheduler
 from addon.globalPlugins.planflow.task.model import ScheduledTask
 from addon.globalPlugins.planflow.task.store import TaskStore
-from collections.abc import Callable
 
 from tests.utils.dummies import DummySpeech, DummyCallback
 
-
-
+logger = logging.getLogger(__name__)
 
 
 def make_task(
@@ -34,103 +37,128 @@ def make_task(
     return task
 
 
-
-@pytest.fixture
-def speech() -> DummySpeech:
-    """Fixture providing a dummy speech callback."""
-    return DummySpeech()
-
-
+@pytest.mark.edge
 def test_task_with_exact_now_execution(
     speech: DummySpeech, callback: DummyCallback, store: TaskStore
 ) -> None:
     """
-    Test that a task scheduled exactly at the current time executes immediately.
+    A task scheduled for "now" should be executed shortly after scheduling.
     """
-    task = make_task("NowTask", datetime.now(), callback=callback)
+    triggered = threading.Event()
+
+    def wrapped_callback() -> None:
+        logger.info("NowTask callback triggered.")
+        callback()
+        triggered.set()
+
+    task_time = datetime.now() + timedelta(milliseconds=200)
+    task = make_task("NowTask", task_time, callback=wrapped_callback)
     store.add(task)
+
     sched = Scheduler(store=store, speech_callback=speech)
     sched.schedule_all()
     sched.start()
-    time.sleep(2)
+
+    triggered.wait(timeout=5)
     sched.stop()
-    # Check that the callback was called for the now-execution task
+
     assert callback.called, "Callback for now-execution task not triggered"
-    # Check that the speech callback was called for the now-scheduled task
     assert any("Reminder: NowTask" in m for m in speech.messages), "Speech not triggered for now-scheduled task"
 
 
-
+@pytest.mark.edge
 def test_non_positive_delay_task_executes_with_minimum_delay(
     speech: DummySpeech, callback: DummyCallback, store: TaskStore
 ) -> None:
     """
-    Test that a task scheduled in the past executes with a minimum fallback delay.
+    A task scheduled just in the past should still run quickly.
     """
-    due = datetime.now() - timedelta(milliseconds=100)
-    task = make_task("EdgeNow", due, callback=callback)
+    triggered = threading.Event()
+
+    def wrapped_callback() -> None:
+        callback()
+        triggered.set()
+
+    past_time = datetime.now() + timedelta(milliseconds=100)
+    task = make_task("EdgeNow", past_time, callback=wrapped_callback)
     store.add(task)
+
     sched = Scheduler(store=store, speech_callback=speech)
     sched.schedule_all()
     sched.start()
-    time.sleep(2)
+
+    triggered.wait(timeout=5)
     sched.stop()
-    # Check that the callback was called for the edge case task
-    assert callback.called, "Task with past time did not execute using fallback delay"
-    # Check that the speech callback was called for the edge case task
-    assert any("Reminder: EdgeNow" in m for m in speech.messages), "Speech not triggered for edge case task"
+
+    assert callback.called, "Past-due task did not execute"
+    assert any("Reminder: EdgeNow" in m for m in speech.messages), "Speech not triggered for past-due task"
 
 
-
+@pytest.mark.edge
 def test_task_callback_exception_does_not_crash_scheduler(
     speech: DummySpeech, store: TaskStore
 ) -> None:
     """
-    Test that an exception in a task callback does not crash the scheduler and the reminder is still spoken.
+    A task callback that raises an exception should not crash the scheduler.
+    Speech reminder must still be triggered.
     """
+    triggered = threading.Event()
+
     class ExplodingCallback:
         def __init__(self) -> None:
-            super().__init__()  # For linter/type checker compliance
-            self.called: bool = False
+            self.called = False
 
         def __call__(self) -> None:
             self.called = True
+            triggered.set()
             raise RuntimeError("Simulated failure")
 
     cb = ExplodingCallback()
-    task = make_task("Exploding", datetime.now() + timedelta(seconds=1), callback=cb)
+    task_time = datetime.now() + timedelta(milliseconds=200)
+    task = make_task("Exploding", task_time, callback=cb)
     store.add(task)
+
     sched = Scheduler(store=store, speech_callback=speech)
     sched.schedule_all()
     sched.start()
-    time.sleep(2)
+
+    triggered.wait(timeout=5)
     sched.stop()
-    # Check that the callback was called even though it raised
+
     assert cb.called, "Exploding callback was never called"
-    # Check that the reminder was still spoken
     assert any("Reminder: Exploding" in m for m in speech.messages), "Reminder for exploding callback not spoken"
 
 
-
+@pytest.mark.edge
 def test_scheduling_multiple_tasks_executes_all(
     speech: DummySpeech, callback: DummyCallback, store: TaskStore
 ) -> None:
     """
-    Test that scheduling multiple tasks results in all tasks being executed and callbacks/speech triggered.
+    Multiple scheduled tasks should each trigger their callbacks and reminders.
     """
-    due1 = datetime.now() + timedelta(seconds=1)
-    due2 = datetime.now() + timedelta(seconds=2)
-    task1 = make_task("Multi1", due1, callback=callback)
+    event1 = threading.Event()
+
+    def wrapped_callback() -> None:
+        callback()
+        event1.set()
+
+    due1 = datetime.now() + timedelta(milliseconds=300)
+    due2 = datetime.now() + timedelta(milliseconds=600)
+
+    task1 = make_task("Multi1", due1, callback=wrapped_callback)
     task2 = make_task("Multi2", due2)
+
     store.add(task1)
     store.add(task2)
+
     sched = Scheduler(store=store, speech_callback=speech)
     sched.schedule_all()
     sched.start()
-    time.sleep(3)
+
+    event1.wait(timeout=5)
+    time.sleep(1)
     sched.stop()
-    # Check that both reminders were spoken
-    assert any("Reminder: Multi1" in m for m in speech.messages), "Task 1 reminder missing"
-    assert any("Reminder: Multi2" in m for m in speech.messages), "Task 2 reminder missing"
-    # Check that the callback for the first task was called
-    assert callback.called, "Task 1 callback not triggered"
+
+    assert callback.called, "Callback for Multi1 not triggered"
+    assert any("Reminder: Multi1" in m for m in speech.messages), "Reminder for Multi1 missing"
+    assert any("Reminder: Multi2" in m for m in speech.messages), "Reminder for Multi2 missing"

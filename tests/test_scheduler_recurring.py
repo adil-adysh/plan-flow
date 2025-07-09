@@ -1,18 +1,21 @@
+
 """
-Tests for recurring task logic in Scheduler:
-- Task recurs and executes multiple times
-- Rescheduled time is persisted to store
+Tests for recurring task logic in Scheduler.
+
+- Verifies that a recurring task executes multiple times and triggers callback and speech.
+- Ensures rescheduled time is persisted to store after execution.
 """
+
 
 import time
 from datetime import datetime, timedelta
+from collections.abc import Callable
+from pathlib import Path
 import pytest
+
 from addon.globalPlugins.planflow.task.schedule import Scheduler
 from addon.globalPlugins.planflow.task.model import ScheduledTask
 from addon.globalPlugins.planflow.task.store import TaskStore
-from collections.abc import Callable
-from pathlib import Path
-
 from tests.utils.dummies import DummySpeech, DummyCallback
 
 
@@ -23,16 +26,27 @@ def make_task(
     recurrence: timedelta | None = None,
     callback: Callable[[], None] | None = None
 ) -> ScheduledTask:
-    """
-    Helper to create a ScheduledTask with optional recurrence and callback.
+    """Create a ScheduledTask with optional recurrence and callback.
+
+    Args:
+        label: Task label.
+        due: Due datetime for the task.
+        recurrence: Optional recurrence interval.
+        callback: Optional callback function.
+
+    Returns:
+        ScheduledTask: The constructed task.
     """
     task = ScheduledTask(label=label, time=due, recurrence=recurrence)
     if callback:
         task.callback = callback
     return task
+
+@pytest.fixture
 def db_path(tmp_path: Path) -> Path:
     """Fixture providing a temporary path for the test database file."""
     return tmp_path / "db.json"
+
 
 
 
@@ -43,11 +57,16 @@ def store(db_path: Path) -> TaskStore:
 
 
 
+
 def test_recurring_task_runs_multiple_times(
     speech: DummySpeech, callback: DummyCallback, store: TaskStore
 ) -> None:
-    """
-    Test that a recurring task executes multiple times and triggers callback and speech.
+    """Test that a recurring task executes multiple times and triggers callback and speech.
+
+    Args:
+        speech: DummySpeech instance for capturing reminders.
+        callback: DummyCallback instance for tracking callback invocations.
+        store: TaskStore instance for task persistence.
     """
     due = datetime.now() + timedelta(seconds=1)
     recur = timedelta(seconds=1)
@@ -58,19 +77,22 @@ def test_recurring_task_runs_multiple_times(
     sched.start()
     time.sleep(3)
     sched.stop()
-    # Check that the recurring reminder occurred multiple times
     reminders = [m for m in speech.messages if "Reminder: Recurring" in m]
     assert len(reminders) >= 2, "Recurring reminder did not occur multiple times"
-    # Check that the callback for the recurring task was triggered
     assert callback.called, "Callback for recurring task not triggered"
+
 
 
 
 def test_task_reschedule_after_recurrence_persists_in_store(
     speech: DummySpeech, callback: DummyCallback, store: TaskStore
 ) -> None:
-    """
-    Test that a recurring task's rescheduled time is persisted in the store after execution.
+    """Test that a recurring task's rescheduled time is persisted in the store after execution.
+
+    Args:
+        speech: DummySpeech instance for capturing reminders.
+        callback: DummyCallback instance for tracking callback invocations.
+        store: TaskStore instance for task persistence.
     """
     recur = timedelta(seconds=1)
     due = datetime.now() + timedelta(seconds=1)
@@ -81,8 +103,6 @@ def test_task_reschedule_after_recurrence_persists_in_store(
     sched.start()
     time.sleep(3)
     sched.stop()
-    # Check that the recurring task is still in the store after execution
     updated = next((t for t in store.tasks if t.label == "PersistentRecurring"), None)
     assert updated is not None, "Recurring task missing from store after execution"
-    # Check that the recurring task's time was updated after run
     assert updated.time > due, "Recurring task time not updated after run"
