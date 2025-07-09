@@ -13,29 +13,9 @@ from addon.globalPlugins.planflow.task.model import ScheduledTask
 from addon.globalPlugins.planflow.task.store import TaskStore
 from collections.abc import Callable
 
+from tests.utils.dummies import DummySpeech, DummyCallback
 
 
-class DummySpeech:
-    """Dummy speech callback for capturing speech messages in tests."""
-    def __init__(self) -> None:
-        super().__init__()  # For linter/type checker compliance
-        self.messages: list[str] = []
-
-    def __call__(self, msg: str) -> None:
-        """Capture a speech message."""
-        self.messages.append(msg)
-
-
-
-class DummyCallback:
-    """Dummy callback for tracking invocation in tests."""
-    def __init__(self) -> None:
-        super().__init__()  # For linter/type checker compliance
-        self.called: bool = False
-
-    def __call__(self) -> None:
-        """Mark the callback as called."""
-        self.called = True
 
 
 
@@ -59,30 +39,6 @@ def make_task(
 def speech() -> DummySpeech:
     """Fixture providing a dummy speech callback."""
     return DummySpeech()
-
-
-
-@pytest.fixture
-def callback() -> DummyCallback:
-    """Fixture providing a dummy callback."""
-    return DummyCallback()
-
-
-
-from pathlib import Path
-
-@pytest.fixture
-def db_path(tmp_path: Path) -> Path:
-    """Fixture providing a temporary path for the test database file."""
-    return tmp_path / "db.json"
-
-
-
-@pytest.fixture
-def store(db_path: Path) -> TaskStore:
-    """Fixture providing a TaskStore using a temporary database file."""
-    return TaskStore(file_path=str(db_path))
-
 
 
 def test_task_with_exact_now_execution(

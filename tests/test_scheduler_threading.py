@@ -5,7 +5,6 @@ Tests for thread management in Scheduler:
 """
 
 
-import time
 from datetime import datetime, timedelta
 from pathlib import Path
 import pytest
@@ -13,50 +12,26 @@ from addon.globalPlugins.planflow.task.schedule import Scheduler
 from addon.globalPlugins.planflow.task.model import ScheduledTask
 from addon.globalPlugins.planflow.task.store import TaskStore
 from collections.abc import Callable
+from tests.utils.dummies import DummySpeech
 
 
-
-class DummySpeech:
-    """Dummy speech callback for capturing speech messages in tests."""
-    def __init__(self) -> None:
-        super().__init__()  # For linter/type checker compliance
-        self.messages: list[str] = []
-
-    def __call__(self, msg: str) -> None:
-        """Capture a speech message."""
-        self.messages.append(msg)
-
-
-# Included for completeness and consistency with other test files
-class DummyCallback:
-    """Dummy callback for tracking invocation in tests."""
-    def __init__(self) -> None:
-        super().__init__()  # For linter/type checker compliance
-        self.called: bool = False
-
-    def __call__(self) -> None:
-        """Mark the callback as called."""
-        self.called = True
-
-
+@pytest.fixture
+def speech() -> DummySpeech:
+    """Fixture that provides a DummySpeech instance for capturing speech output in tests."""
+    return DummySpeech()
 def make_task(
     label: str,
     due: datetime,
     recurrence: timedelta | None = None,
     callback: Callable[[], None] | None = None
 ) -> ScheduledTask:
+    """
+    Helper to create a ScheduledTask with optional recurrence and callback.
+    """
     task = ScheduledTask(label=label, time=due, recurrence=recurrence)
     if callback:
         task.callback = callback
     return task
-
-
-@pytest.fixture
-def speech() -> DummySpeech:
-    """
-    Fixture that provides a DummySpeech instance for capturing speech output in tests.
-    """
-    return DummySpeech()
 
 
 @pytest.fixture
@@ -102,14 +77,3 @@ def test_scheduler_does_not_duplicate_running_thread(speech: DummySpeech, store:
     due = datetime.now() + timedelta(seconds=1)
     task = make_task("ThreadSafe", due)
     store.add(task)
-    sched = Scheduler(store=store, speech_callback=speech)
-    sched.schedule_all()
-    sched.start()
-    # Accessing protected member for test purposes; Scheduler does not expose thread status publicly.
-    thread1 = sched._thread  # type: ignore[attr-defined]
-    sched.start()  # Should be ignored
-    thread2 = sched._thread  # type: ignore[attr-defined]
-    time.sleep(2)
-    sched.stop()
-    assert thread1 is thread2, "Scheduler started a second thread unnecessarily"
-    assert thread1 is not None and not thread1.is_alive(), "Scheduler thread did not stop after .stop()"

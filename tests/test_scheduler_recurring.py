@@ -11,30 +11,9 @@ from addon.globalPlugins.planflow.task.schedule import Scheduler
 from addon.globalPlugins.planflow.task.model import ScheduledTask
 from addon.globalPlugins.planflow.task.store import TaskStore
 from collections.abc import Callable
+from pathlib import Path
 
-
-
-class DummySpeech:
-    """Dummy speech callback for capturing speech messages in tests."""
-    def __init__(self) -> None:
-        super().__init__()  # For linter/type checker compliance
-        self.messages: list[str] = []
-
-    def __call__(self, msg: str) -> None:
-        """Capture a speech message."""
-        self.messages.append(msg)
-
-
-
-class DummyCallback:
-    """Dummy callback for tracking invocation in tests."""
-    def __init__(self) -> None:
-        super().__init__()  # For linter/type checker compliance
-        self.called: bool = False
-
-    def __call__(self) -> None:
-        """Mark the callback as called."""
-        self.called = True
+from tests.utils.dummies import DummySpeech, DummyCallback
 
 
 
@@ -51,26 +30,6 @@ def make_task(
     if callback:
         task.callback = callback
     return task
-
-
-
-@pytest.fixture
-def speech() -> DummySpeech:
-    """Fixture providing a dummy speech callback."""
-    return DummySpeech()
-
-
-
-@pytest.fixture
-def callback() -> DummyCallback:
-    """Fixture providing a dummy callback."""
-    return DummyCallback()
-
-
-
-from pathlib import Path
-
-@pytest.fixture
 def db_path(tmp_path: Path) -> Path:
     """Fixture providing a temporary path for the test database file."""
     return tmp_path / "db.json"

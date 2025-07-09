@@ -12,30 +12,13 @@ from addon.globalPlugins.planflow.task.model import ScheduledTask
 from addon.globalPlugins.planflow.task.store import TaskStore
 from collections.abc import Callable
 
+from tests.utils.dummies import DummySpeech, DummyCallback
 
 
-class DummySpeech:
-    """Dummy speech callback for capturing speech messages in tests."""
-    def __init__(self) -> None:
-        super().__init__()  # For linter/type checker compliance
-        self.messages: list[str] = []
-
-    def __call__(self, msg: str) -> None:
-        """Capture a speech message."""
-        self.messages.append(msg)
-
-
-
-class DummyCallback:
-    """Dummy callback for tracking invocation in tests."""
-    def __init__(self) -> None:
-        super().__init__()  # For linter/type checker compliance
-        self.called: bool = False
-
-    def __call__(self) -> None:
-        """Mark the callback as called."""
-        self.called = True
-
+@pytest.fixture
+def speech() -> DummySpeech:
+    """Fixture providing a dummy speech callback."""
+    return DummySpeech()
 
 
 def make_task(
@@ -52,12 +35,6 @@ def make_task(
         task.callback = callback
     return task
 
-
-
-@pytest.fixture
-def speech() -> DummySpeech:
-    """Fixture providing a dummy speech callback."""
-    return DummySpeech()
 
 
 
