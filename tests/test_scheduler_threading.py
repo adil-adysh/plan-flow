@@ -15,13 +15,28 @@ from addon.globalPlugins.planflow.task.store import TaskStore
 from collections.abc import Callable
 
 
+
 class DummySpeech:
+    """Dummy speech callback for capturing speech messages in tests."""
     def __init__(self) -> None:
-        super().__init__()
+        super().__init__()  # For linter/type checker compliance
         self.messages: list[str] = []
 
     def __call__(self, msg: str) -> None:
+        """Capture a speech message."""
         self.messages.append(msg)
+
+
+# Included for completeness and consistency with other test files
+class DummyCallback:
+    """Dummy callback for tracking invocation in tests."""
+    def __init__(self) -> None:
+        super().__init__()  # For linter/type checker compliance
+        self.called: bool = False
+
+    def __call__(self) -> None:
+        """Mark the callback as called."""
+        self.called = True
 
 
 def make_task(
