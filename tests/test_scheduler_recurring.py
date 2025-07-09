@@ -13,20 +13,29 @@ from addon.globalPlugins.planflow.task.store import TaskStore
 from collections.abc import Callable
 
 
+
 class DummySpeech:
-    def __init__(self):
+    """Dummy speech callback for capturing speech messages in tests."""
+    def __init__(self) -> None:
+        super().__init__()  # For linter/type checker compliance
         self.messages: list[str] = []
 
     def __call__(self, msg: str) -> None:
+        """Capture a speech message."""
         self.messages.append(msg)
 
 
-class DummyCallback:
-    def __init__(self):
-        self.called = False
 
-    def __call__(self):
+class DummyCallback:
+    """Dummy callback for tracking invocation in tests."""
+    def __init__(self) -> None:
+        super().__init__()  # For linter/type checker compliance
+        self.called: bool = False
+
+    def __call__(self) -> None:
+        """Mark the callback as called."""
         self.called = True
+
 
 
 def make_task(
@@ -35,33 +44,52 @@ def make_task(
     recurrence: timedelta | None = None,
     callback: Callable[[], None] | None = None
 ) -> ScheduledTask:
+    """
+    Helper to create a ScheduledTask with optional recurrence and callback.
+    """
     task = ScheduledTask(label=label, time=due, recurrence=recurrence)
     if callback:
         task.callback = callback
     return task
 
 
+
 @pytest.fixture
-def speech():
+def speech() -> DummySpeech:
+    """Fixture providing a dummy speech callback."""
     return DummySpeech()
 
 
+
 @pytest.fixture
-def callback():
+def callback() -> DummyCallback:
+    """Fixture providing a dummy callback."""
     return DummyCallback()
 
 
+
+from pathlib import Path
+
 @pytest.fixture
-def db_path(tmp_path):
+def db_path(tmp_path: Path) -> Path:
+    """Fixture providing a temporary path for the test database file."""
     return tmp_path / "db.json"
 
 
+
 @pytest.fixture
-def store(db_path):
+def store(db_path: Path) -> TaskStore:
+    """Fixture providing a TaskStore using a temporary database file."""
     return TaskStore(file_path=str(db_path))
 
 
-def test_recurring_task_runs_multiple_times(speech, callback, store):
+
+def test_recurring_task_runs_multiple_times(
+    speech: DummySpeech, callback: DummyCallback, store: TaskStore
+) -> None:
+    """
+    Test that a recurring task executes multiple times and triggers callback and speech.
+    """
     due = datetime.now() + timedelta(seconds=1)
     recur = timedelta(seconds=1)
     task = make_task("Recurring", due, recurrence=recur, callback=callback)
@@ -71,12 +99,20 @@ def test_recurring_task_runs_multiple_times(speech, callback, store):
     sched.start()
     time.sleep(3)
     sched.stop()
+    # Check that the recurring reminder occurred multiple times
     reminders = [m for m in speech.messages if "Reminder: Recurring" in m]
     assert len(reminders) >= 2, "Recurring reminder did not occur multiple times"
+    # Check that the callback for the recurring task was triggered
     assert callback.called, "Callback for recurring task not triggered"
 
 
-def test_task_reschedule_after_recurrence_persists_in_store(speech, callback, store):
+
+def test_task_reschedule_after_recurrence_persists_in_store(
+    speech: DummySpeech, callback: DummyCallback, store: TaskStore
+) -> None:
+    """
+    Test that a recurring task's rescheduled time is persisted in the store after execution.
+    """
     recur = timedelta(seconds=1)
     due = datetime.now() + timedelta(seconds=1)
     task = make_task("PersistentRecurring", due, recurrence=recur, callback=callback)
@@ -86,6 +122,8 @@ def test_task_reschedule_after_recurrence_persists_in_store(speech, callback, st
     sched.start()
     time.sleep(3)
     sched.stop()
+    # Check that the recurring task is still in the store after execution
     updated = next((t for t in store.tasks if t.label == "PersistentRecurring"), None)
     assert updated is not None, "Recurring task missing from store after execution"
+    # Check that the recurring task's time was updated after run
     assert updated.time > due, "Recurring task time not updated after run"
