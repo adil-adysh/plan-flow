@@ -46,6 +46,13 @@ When adding or updating test cases for PlanFlow:
 - Use fixtures for setup/teardown if needed (see `pytest` docs).
 - Add docstrings to test functions and classes to describe their purpose.
 - Add useful comments explaining the purpose of each test case, especially where the intent or logic may not be obvious.
+- All test functions, fixtures, and helper functions must have explicit type annotations for parameters and return types.
+- Add type annotations for pytest fixture parameters (e.g., `tmp_path: Path`).
+- If a class defines `__init__`, always call `super().__init__()` for linter and type checker compliance.
+- Use `type: ignore` comments only when necessary (e.g., accessing protected members for testability), and always add a comment explaining why.
+- Import all types used in annotations (e.g., `Path` from `pathlib`).
+- Ensure all test files pass strict linting and type checking (e.g., Ruff, Pyright in strict mode).
+- Add useful comments explaining the purpose of each test case, especially where the intent or logic may not be obvious.
 
 **Example:**
 
