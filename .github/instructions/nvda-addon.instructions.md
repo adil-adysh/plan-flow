@@ -4,82 +4,213 @@ applyTo: "**"
 
 # PlanFlow Add-on Development Instructions
 
-These are project-wide guidelines to help AI generate consistent, testable, and portable code for the PlanFlow NVDA add-on. The add-on is written in standard Python and should remain compatible with non-NVDA environments unless explicitly required.
+These are project-wide guidelines to help AI and humans generate consistent, testable, and portable code for the PlanFlow NVDA add-on. The add-on is written in standard Python and must remain compatible with non-NVDA environments unless explicitly required.
+
+---
 
 ## General Principles
 
-- Write code that runs in **standard Python** (no NVDA-specific APIs unless explicitly required).
-- Prioritize **cross-platform portability** and readability.
-- Assume all code should be **testable independently of NVDA**.
+- Write code in **standard Python** (no NVDA-specific APIs unless explicitly required).
+- All logic must be **testable independently of NVDA**.
+- Prioritize **readability**, **modularity**, and **portability**.
+- Avoid runtime logic in constructors that depends on I/O or global state.
 
-## Formatting and Style
+---
 
-- Use `ruff` for formatting and linting.
-- Follow **PEP8** conventions.
-- Use **type annotations** wherever meaningful.
-- Keep imports sorted: stdlib, third-party, then local.
+## File Structure & Naming
 
-## Code Structure
+- Core logic: `addon/globalPlugins/planflow/`
+- Unit tests: `tests/`
+- File naming:
+  - `*_model.py` for data structures
+  - `*_manager.py`, `*_service.py` for behavior
+  - `test_*.py` for test files
+- Organize related modules into folders (`task/`, `utils/`, etc.)
 
-- Use **`dataclass`** for structured data, and favor immutability when possible.
-- Runtime-only attributes (e.g., callbacks) must be:
-  - marked with `repr=False`, and
-  - excluded from `__eq__` comparisons (`compare=False`).
-- Avoid any logic inside `__init__` that depends on external systems (e.g., I/O, NVDA globals).
+---
+
+## NVDA Compatibility Rules
+
+- Core logic must not use NVDA APIs.
+- NVDA-specific code (e.g. speech, UI hooks) must be isolated in `nvda_adapter/`.
+- Unit tests must not import NVDA modules.
+- Mock NVDA behavior with clear `# NVDA MOCK:` comments when absolutely necessary.
+
+---
+
+## Code Formatting, Style & Structure
+
+- Use [Ruff](https://docs.astral.sh/ruff/) for formatting, linting, and import sorting.
+- Use [Pyright](https://github.com/microsoft/pyright) in **strict mode** for type checking.
+- Follow **PEP8** and **PEP257** style and docstring conventions.
+
+### Naming Conventions
+
+| Entity        | Style         | Example              |
+|---------------|---------------|----------------------|
+| Function      | `snake_case`  | `get_due_tasks()`    |
+| Class         | `PascalCase`  | `ScheduledTask`      |
+| Constant      | `ALL_CAPS`    | `DEFAULT_TIMEOUT`    |
+| Private Field | `_underscore` | `_callback`          |
+
+---
+
+## Type Annotations — Required
+
+All implementation code **must** include full type annotations:
+
+- Every **function and method** must specify parameter and return types.
+- Use `-> None` explicitly when a function returns nothing.
+- Use `Optional[...]` where `None` is a valid value.
+- Use `Literal`, `Union`, `TypedDict`, or `Annotated` as needed for clarity.
+
+---
+
+## Docstrings — Required
+
+All modules, classes, methods, and functions must include **meaningful docstrings**:
+
+| Element      | Docstring Requirement                            |
+|--------------|---------------------------------------------------|
+| Module       | At the top of every `.py` file                    |
+| Class        | Summarize its purpose and usage                   |
+| Function     | Describe what it does, parameters, and returns    |
+| Method       | Same as function (document `self`-based behavior) |
+
+Use **Google-style**, **reST**, or **NumPy-style** consistently.
+
+### Example — Function with Type Hints and Docstring
+
+```python
+def calculate_priority(deadline: int, weight: float) -> float:
+    """Calculate task priority based on deadline and weight.
+
+    Args:
+        deadline: UNIX timestamp of the task deadline.
+        weight: Importance multiplier (1.0 = neutral).
+
+    Returns:
+        A float score representing the task's priority.
+    """
+    return weight / (deadline + 1)
+````
+
+---
+
+## Dataclass Guidelines
+
+* Use `@dataclass` for structured data.
+* Favor immutability: `frozen=True` where appropriate.
+* Use `slots=True` for memory efficiency.
+* Runtime-only or callback fields must:
+
+  * be prefixed with `_`
+  * use `repr=False`, `compare=False`
+
+---
 
 ## Testing & Environment
 
-- All code should be testable using **standard Python test frameworks** like `pytest`.
-- Do not require NVDA to be installed for running unit tests.
-- Prefer structured return values over `print()` or side effects.
+* Use [pytest](https://docs.pytest.org/) for all unit tests.
+* Test files live in `tests/` and are named `test_*.py`
+* Tests must:
 
-## Implementing Test Cases with pytest
+  * run in standard Python (no NVDA dependencies)
+  * avoid global state and side effects
+  * use fixtures for setup
 
-When adding or updating test cases for PlanFlow:
-
-- Place all test files in the `tests/` directory. Name files as `test_*.py`.
-- Use standard `pytest` conventions: test functions should be named `test_*` and test classes should be named `Test*` (no `__init__` method required).
-- Import the module to be tested using relative imports (e.g., `from addon.globalPlugins.planflow.task import model`).
-- Each test should be independent and not rely on NVDA or external state.
-- Use assertions to check expected behavior. Avoid `print()` statements.
-- Prefer small, focused test functions over large, complex ones.
-- Use fixtures for setup/teardown if needed (see `pytest` docs).
-- Add docstrings to test functions and classes to describe their purpose.
-- Add useful comments explaining the purpose of each test case, especially where the intent or logic may not be obvious.
-- All test functions, fixtures, and helper functions must have explicit type annotations for parameters and return types.
-- Add type annotations for pytest fixture parameters (e.g., `tmp_path: Path`).
-- If a class defines `__init__`, always call `super().__init__()` for linter and type checker compliance.
-- Use `type: ignore` comments only when necessary (e.g., accessing protected members for testability), and always add a comment explaining why.
-- Import all types used in annotations (e.g., `Path` from `pathlib`).
-- Ensure all test files pass strict linting and type checking (e.g., Ruff, Pyright in strict mode).
-- Add useful comments explaining the purpose of each test case, especially where the intent or logic may not be obvious.
-
-**Example:**
+### Example — Typed Pytest Fixture
 
 ```python
 import pytest
-from addon.globalPlugins.planflow.task.model import ScheduledTask
+from pathlib import Path
 
-def test_scheduled_task_due():
-    """Test that ScheduledTask correctly reports when it is due."""
-    task = ScheduledTask(name="demo", due_time=1234567890)
-    assert task.is_due(1234567890)
+@pytest.fixture
+def sample_file(tmp_path: Path) -> Path:
+    """Create a sample file with default content."""
+    file = tmp_path / "sample.txt"
+    file.write_text("Hello")
+    return file
 ```
+
+---
+
+## Tooling & Automation
+
+Configure these tools and enforce via CI and VS Code:
+
+| Tool    | Purpose              | VS Code Extension ID |
+| ------- | -------------------- | -------------------- |
+| Ruff    | Linting + formatting | `charliermarsh.ruff` |
+| Pyright | Type checking        | `ms-pyright.pyright` |
+| Pytest  | Unit testing         | `ms-python.python`   |
+
+```jsonc
+// .vscode/settings.json (recommended)
+{
+  "python.testing.pytestEnabled": true,
+  "python.testing.pytestArgs": ["tests"],
+  "python.analysis.typeCheckingMode": "strict",
+  "ruff.enabled": true,
+  "editor.formatOnSave": true,
+  "editor.codeActionsOnSave": {
+    "source.fixAll": true,
+    "source.organizeImports": true
+  },
+  "github.copilot.advanced": {
+    "enableInstructionFiles": true
+  }
+}
+```
+
+---
+
+## AI Code Generation Guidelines
+
+When using Copilot, Copilot Chat, or other AI:
+
+* **Always** include:
+
+  * Type annotations
+  * Docstrings for classes, functions, methods, modules
+* Do not use NVDA-specific APIs unless explicitly required
+* Prefer pure Python examples
+* Structure code for testability
+* Use `pytest` style and test structure as outlined
+
+---
+
+## Example — Minimal Valid Python Module
+
+```python
+"""Module for handling scheduled task logic."""
+
+from dataclasses import dataclass
+
+@dataclass(frozen=True, slots=True)
+class ScheduledTask:
+    """A scheduled task with a due time."""
+    name: str
+    due_time: int
+
+    def is_due(self, current_time: int) -> bool:
+        """Check if the task is due at the given time.
+
+        Args:
+            current_time: UNIX timestamp to compare against due time.
+
+        Returns:
+            True if the task is due, else False.
+        """
+        return current_time >= self.due_time
+```
+
+---
 
 ## Behavior Guidelines
 
-- AI should prefer adding small, focused functions over deeply nested logic.
-- When uncertain between simplicity and abstraction, **choose readability**.
+* Avoid complex nesting; favor small, focused functions.
+* Separate concerns clearly (data, logic, IO/adapters).
+* When in doubt, choose **readability** and **clarity**.
 
-## Naming Conventions
-
-- Use `snake_case` for functions, variables, and file names.
-- Use `PascalCase` for class and dataclass names.
-- Use `ALL_CAPS` for module-level constants.
-- Prefix internal or private runtime fields with `_`.
-
-## AI Prompt-Specific Behavior
-
-- Avoid assumptions about the NVDA environment unless context explicitly requires it.
-- Provide clean, minimal examples that work in a **non-NVDA Python interpreter**.
-- Always add meaningful docstrings, especially for public APIs and dataclasses.
+---
