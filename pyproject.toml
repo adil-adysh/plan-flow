@@ -1,3 +1,24 @@
+[tool.poetry]
+name = "planflow"
+version = "0.1.0"
+description = "PlanFlow NVDA add-on core logic and utilities."
+authors = ["adil-adysh <your-email@example.com>"]
+license = "MIT"
+readme = "readme.md"
+
+[tool.poetry.dependencies]
+python = ">=3.11,<3.12"
+tinydb = "^4.8.0"
+apscheduler = "^3.10.4"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.0.0"
+ruff = "^0.4.0"
+pyright = "^1.1.350"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
 [tool.ruff]
 line-length = 110
 
@@ -162,5 +183,5 @@ reportMissingTypeStubs = false
 
 [tool.pytest.ini_options]
 markers = [
-    "edge: edge case tests for Scheduler"
+	"edge: edge case tests for Scheduler"
 ]
