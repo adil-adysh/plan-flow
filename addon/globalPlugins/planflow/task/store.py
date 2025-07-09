@@ -6,7 +6,7 @@ Provides add, update, remove, list, and clear operations.
 from typing import Any
 from datetime import datetime
 from tinydb import TinyDB, Query
-from tinydb.storages import JSONStorage
+from tinydb.storages import JSONStorage, Storage
 from .serialiser import to_dict, from_dict
 from .model import ScheduledTask
 
@@ -15,9 +15,12 @@ class TaskStore:
 	TaskStore manages persistence of ScheduledTask objects using TinyDB.
 	All tasks are loaded into memory for fast access.
 	"""
-	def __init__(self, file_path: str = "tasks.json"):
-		"""Initialize the store and load all tasks from disk."""
-		self.db = TinyDB(file_path, storage=JSONStorage)
+	def __init__(self, file_path: str = "tasks.json", storage: type[Storage] = JSONStorage):
+		"""Initialize the store and load all tasks from disk. Accepts custom storage for testing."""
+		if storage is JSONStorage:
+			self.db = TinyDB(file_path, storage=storage)
+		else:
+			self.db = TinyDB(storage=storage)
 		self.query = Query()
 		self.tasks: list[ScheduledTask] = []
 		self.load()
