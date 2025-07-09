@@ -45,6 +45,7 @@ When adding or updating test cases for PlanFlow:
 - Prefer small, focused test functions over large, complex ones.
 - Use fixtures for setup/teardown if needed (see `pytest` docs).
 - Add docstrings to test functions and classes to describe their purpose.
+- Add useful comments explaining the purpose of each test case, especially where the intent or logic may not be obvious.
 
 **Example:**
 
