@@ -33,6 +33,31 @@ These are project-wide guidelines to help AI generate consistent, testable, and 
 - Do not require NVDA to be installed for running unit tests.
 - Prefer structured return values over `print()` or side effects.
 
+## Implementing Test Cases with pytest
+
+When adding or updating test cases for PlanFlow:
+
+- Place all test files in the `tests/` directory. Name files as `test_*.py`.
+- Use standard `pytest` conventions: test functions should be named `test_*` and test classes should be named `Test*` (no `__init__` method required).
+- Import the module to be tested using relative imports (e.g., `from addon.globalPlugins.planflow.task import model`).
+- Each test should be independent and not rely on NVDA or external state.
+- Use assertions to check expected behavior. Avoid `print()` statements.
+- Prefer small, focused test functions over large, complex ones.
+- Use fixtures for setup/teardown if needed (see `pytest` docs).
+- Add docstrings to test functions and classes to describe their purpose.
+
+**Example:**
+
+```python
+import pytest
+from addon.globalPlugins.planflow.task.model import ScheduledTask
+
+def test_scheduled_task_due():
+    """Test that ScheduledTask correctly reports when it is due."""
+    task = ScheduledTask(name="demo", due_time=1234567890)
+    assert task.is_due(1234567890)
+```
+
 ## Behavior Guidelines
 
 - AI should prefer adding small, focused functions over deeply nested logic.
