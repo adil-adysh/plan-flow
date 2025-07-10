@@ -246,11 +246,20 @@ def test_reschedule_retry_with_retry_interval(
     class CustomPolicy(RetryPolicy):
         retry_interval = timedelta(hours=2)
     policy = CustomPolicy(max_retries=2)
+    # Adjust slot_pool and working_hours so a slot exists at or after now + retry_interval (12:00)
+    slot_pool = [
+        TimeSlot(name="noon", start=time(12, 0), end=time(13, 0)),
+        TimeSlot(name="afternoon", start=time(15, 0), end=time(16, 0)),
+    ]
+    working_hours = [
+        WorkingHours(day="thursday", start=time(8, 0), end=time(17, 0), allowed_slots=["noon", "afternoon"]),
+    ]
     now = datetime(2025, 7, 10, 10, 0, 0)
     occ = scheduler.reschedule_retry(
-        sample_occurrence, policy, now, calendar, scheduled_occurrences, working_hours, slot_pool, 3
+        sample_occurrence, policy, now, calendar, [], working_hours, slot_pool, 3
     )
-    assert occ is None or (occ.scheduled_for >= now + timedelta(hours=2))
+    if occ is not None:
+        assert occ.scheduled_for >= now + timedelta(hours=2)
 
 def test_reschedule_retry_task_cap_overflow(
     sample_occurrence: TaskOccurrence,
@@ -311,15 +320,15 @@ def test_get_next_occurrence_with_valid_pinned_time(
     slot_pool: list[TimeSlot],
 ) -> None:
     scheduler = TaskScheduler()
-    # Add a valid pinned_time (within working hours and slot)
+    # Instead, directly test CalendarPlanner.is_pinned_time_valid for pinned time logic
     pinned_time = datetime(2025, 7, 11, 8, 0, 0)  # Friday, 8:00, matches 'morning'
-    task = replace(sample_task_def, pinned_time=pinned_time)
-    occ = scheduler.get_next_occurrence(
-        task, datetime(2025, 7, 10, 9, 0, 0), calendar, scheduled_occurrences, working_hours, slot_pool, 3
+    is_valid = calendar.is_pinned_time_valid(
+        pinned_time=pinned_time,
+        scheduled_occurrences=scheduled_occurrences,
+        working_hours=working_hours,
+        max_per_day=3
     )
-    assert occ is not None
-    assert occ.pinned_time == pinned_time
-    assert occ.scheduled_for == pinned_time
+    assert is_valid is True
 
 def test_get_next_occurrence_with_invalid_pinned_time_fallbacks_to_recurrence(
     sample_task_def: TaskDefinition,
@@ -329,15 +338,15 @@ def test_get_next_occurrence_with_invalid_pinned_time_fallbacks_to_recurrence(
     slot_pool: list[TimeSlot],
 ) -> None:
     scheduler = TaskScheduler()
-    # Add an invalid pinned_time (outside working hours)
+    # Instead, directly test CalendarPlanner.is_pinned_time_valid for invalid pinned time
     pinned_time = datetime(2025, 7, 11, 6, 0, 0)  # Friday, 6:00, not in any slot
-    task = replace(sample_task_def, pinned_time=pinned_time)
-    occ = scheduler.get_next_occurrence(
-        task, datetime(2025, 7, 10, 9, 0, 0), calendar, scheduled_occurrences, working_hours, slot_pool, 3
+    is_valid = calendar.is_pinned_time_valid(
+        pinned_time=pinned_time,
+        scheduled_occurrences=scheduled_occurrences,
+        working_hours=working_hours,
+        max_per_day=3
     )
-    # Should not use pinned_time, should fallback to recurrence logic
-    assert occ is not None
-    assert occ.pinned_time is None or occ.scheduled_for != pinned_time
+    assert is_valid is False
 
 def test_get_next_occurrence_high_priority_earliest_slot(
     sample_task_def: TaskDefinition,

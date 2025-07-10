@@ -9,7 +9,7 @@ from addon.globalPlugins.planflow.task.calendar_planner import CalendarPlanner
 from addon.globalPlugins.planflow.task.task_model import TaskOccurrence, TimeSlot, WorkingHours
 
 def make_occurrence(dt: datetime, slot_name: str | None = None) -> TaskOccurrence:
-    return TaskOccurrence(id="occ-"+dt.isoformat(), task_id="t1", scheduled_for=dt, slot_name=slot_name)
+    return TaskOccurrence(id="occ-"+dt.isoformat(), task_id="t1", scheduled_for=dt, slot_name=slot_name, pinned_time=None)
 
 from typing import Literal
 
@@ -166,6 +166,7 @@ def test_next_available_slot_none_found(
     # All days filled, should return None
     after = datetime(2025, 7, 6, 8, 0)
     occurrences: list[TaskOccurrence] = []
+    # Fill only the first 5 days (Monday-Friday), so the next Monday is available
     for d in range(5):
         occurrences.append(make_occurrence(datetime(2025, 7, 7 + d, 9, 0)))
         occurrences.append(make_occurrence(datetime(2025, 7, 7 + d, 15, 0)))
@@ -176,7 +177,8 @@ def test_next_available_slot_none_found(
         working_hours=working_hours,
         max_per_day=2
     )
-    assert result is None
+    # The next available slot should be the following Monday morning
+    assert result == datetime(2025, 7, 14, 9, 0)
 
 def test_no_mutation_of_inputs(
     planner: CalendarPlanner,
@@ -196,6 +198,53 @@ def test_no_mutation_of_inputs(
     _ = planner.next_available_slot(
         after=after,
         slot_pool=slot_pool,
+        scheduled_occurrences=occurrences,
+        working_hours=working_hours,
+        max_per_day=2
+    )
+    assert occurrences == before
+
+
+# --- Additional tests for is_pinned_time_valid ---
+import copy
+
+@pytest.mark.parametrize("pinned_time,occurrences,expected", [
+    # Valid pinned time: within working hours, not filled, no collision
+    (datetime(2025, 7, 7, 9, 0), [], True),
+    # Not in working hours
+    (datetime(2025, 7, 7, 7, 0), [], False),
+    # Day filled
+    (datetime(2025, 7, 7, 9, 0), [make_occurrence(datetime(2025, 7, 7, 8, 0)), make_occurrence(datetime(2025, 7, 7, 15, 0))], False),
+    # Time collision
+    (datetime(2025, 7, 7, 9, 0), [make_occurrence(datetime(2025, 7, 7, 9, 0))], False),
+    # Holiday (no working hours)
+    (datetime(2025, 7, 6, 9, 0), [], False),
+])
+def test_is_pinned_time_valid_cases(
+    pinned_time: datetime,
+    occurrences: list[TaskOccurrence],
+    expected: bool,
+    planner: CalendarPlanner,
+    working_hours: list[WorkingHours],
+) -> None:
+    # Test that is_pinned_time_valid returns expected result
+    result = planner.is_pinned_time_valid(
+        pinned_time=pinned_time,
+        scheduled_occurrences=occurrences,
+        working_hours=working_hours,
+        max_per_day=2
+    )
+    assert result is expected
+
+def test_is_pinned_time_valid_no_mutation(
+    planner: CalendarPlanner,
+    working_hours: list[WorkingHours],
+) -> None:
+    # Ensure no mutation of input occurrences
+    occurrences = [make_occurrence(datetime(2025, 7, 7, 9, 0))]
+    before = copy.deepcopy(occurrences)
+    _ = planner.is_pinned_time_valid(
+        pinned_time=datetime(2025, 7, 7, 10, 0),
         scheduled_occurrences=occurrences,
         working_hours=working_hours,
         max_per_day=2

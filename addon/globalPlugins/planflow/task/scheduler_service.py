@@ -217,6 +217,9 @@ class TaskScheduler:
         preferred_slots.sort(key=lambda s: s.start)
         for slot in preferred_slots:
             slot_dt = base_time.replace(hour=slot.start.hour, minute=slot.start.minute, second=0, microsecond=0)
+            if slot_dt < base_time:
+                # Don't schedule before the retry interval
+                continue
             if not (slot.start <= slot_dt.time() <= slot.end):
                 continue
             if not calendar.is_slot_available(slot_dt, scheduled_occurrences, working_hours, max_per_day, slot_pool=slot_pool):
@@ -228,6 +231,7 @@ class TaskScheduler:
                 slot_name=slot.name,
                 pinned_time=None,
             )
+        # Only consider next_slot if it is after or equal to base_time
         next_slot = calendar.next_available_slot(
             after=base_time,
             slot_pool=slot_pool,
@@ -235,7 +239,7 @@ class TaskScheduler:
             working_hours=working_hours,
             max_per_day=max_per_day
         )
-        if not next_slot:
+        if not next_slot or next_slot < base_time:
             return None
         slot_name = None
         for slot in slot_pool:

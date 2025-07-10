@@ -17,7 +17,7 @@ class CalendarPlanner:
     Enforces working hours, slot preferences, and per-day task limits.
     """
 
-    SEARCH_WINDOW_DAYS: int = 7
+    SEARCH_WINDOW_DAYS: int = 14
 
     def is_slot_available(
         self,
@@ -34,34 +34,29 @@ class CalendarPlanner:
             scheduled_occurrences: List of already scheduled TaskOccurrence.
             working_hours: List of WorkingHours objects for allowed scheduling per weekday.
             max_per_day: Maximum allowed tasks per calendar day.
+            slot_pool: Optional list of allowed TimeSlot objects (user preferences).
 
         Returns:
-            True if the slot is available (within working hours, not exceeding per-day cap, and not colliding with existing tasks), else False.
+            True if the slot is available (within working hours, not exceeding per-day cap, not colliding with existing tasks, and matches allowed slots if specified), else False.
 
         Fallback:
             Returns False if the day is not in working_hours or slot is not allowed.
         """
         day = proposed_time.date()
         weekday = proposed_time.strftime("%A").lower()
-        # Find working hours for this weekday
         wh: WorkingHours | None = next((w for w in working_hours if w.day == weekday), None)
         if wh is None:
             return False
-        # Check if within working hours
         if not (wh.start <= proposed_time.time() <= wh.end):
             return False
-        # Per-day cap
         count = sum(1 for occ in scheduled_occurrences if occ.scheduled_for.date() == day)
         if count >= max_per_day:
             return False
-        # No collision (same time)
         if any(occ.scheduled_for == proposed_time for occ in scheduled_occurrences):
             return False
-        # Must be in allowed_slots for that day if specified
         if wh.allowed_slots:
             if slot_pool is None:
                 return False
-            # Find a slot in slot_pool that matches proposed_time and is allowed
             slot_match = False
             for slot in slot_pool:
                 if slot.name in wh.allowed_slots and slot.start == proposed_time.time():
@@ -69,6 +64,41 @@ class CalendarPlanner:
                     break
             if not slot_match:
                 return False
+        return True
+
+    def is_pinned_time_valid(
+        self,
+        pinned_time: datetime,
+        scheduled_occurrences: list[TaskOccurrence],
+        working_hours: list[WorkingHours],
+        max_per_day: int
+    ) -> bool:
+        """Return True if a user-requested pinned datetime is eligible for scheduling.
+
+        Args:
+            pinned_time: The user-requested datetime to validate.
+            scheduled_occurrences: List of already scheduled TaskOccurrence.
+            working_hours: List of WorkingHours objects for allowed scheduling per weekday.
+            max_per_day: Maximum allowed tasks per calendar day.
+
+        Returns:
+            True if the pinned time is within working hours, does not exceed per-day cap, and does not collide with existing tasks. Ignores slot pool.
+
+        Fallback:
+            Returns False if the day is not in working_hours or pinned time is not allowed.
+        """
+        day = pinned_time.date()
+        weekday = pinned_time.strftime("%A").lower()
+        wh: WorkingHours | None = next((w for w in working_hours if w.day == weekday), None)
+        if wh is None:
+            return False
+        if not (wh.start <= pinned_time.time() <= wh.end):
+            return False
+        count = sum(1 for occ in scheduled_occurrences if occ.scheduled_for.date() == day)
+        if count >= max_per_day:
+            return False
+        if any(occ.scheduled_for == pinned_time for occ in scheduled_occurrences):
+            return False
         return True
 
     def next_available_slot(
@@ -91,10 +121,10 @@ class CalendarPlanner:
             priority: Optional integer to affect slot ordering (lower = higher priority).
 
         Returns:
-            The first available datetime matching all constraints, or None if not found within 7 days.
+            The first available datetime matching all constraints, or None if not found within 14 days.
 
         Fallback:
-            Returns None if no valid slot is found within the 7-day search window.
+            Returns None if no valid slot is found within the 14-day search window.
         """
         search_start = after + timedelta(minutes=1)
         for day_offset in range(self.SEARCH_WINDOW_DAYS):
@@ -103,15 +133,14 @@ class CalendarPlanner:
             wh: WorkingHours | None = next((w for w in working_hours if w.day == weekday), None)
             if wh is None:
                 continue  # skip holidays or days with no working hours
-            # Filter slots within working hours and allowed_slots
             slots_today = [
                 slot for slot in slot_pool
                 if (
                     wh.start <= slot.start <= wh.end
+                    
                     and (not wh.allowed_slots or slot.name in wh.allowed_slots)
                 )
             ]
-            # Sort slots by priority if provided
             if priority is not None and 0 <= priority < len(slots_today):
                 slots_today = slots_today[priority:] + slots_today[:priority]
             for slot in slots_today:
