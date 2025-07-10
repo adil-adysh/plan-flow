@@ -13,6 +13,7 @@ This module defines the **core data models** used by the PlanFlow task scheduler
 - Represent tasks, retries, time slots, and execution status
 - Enable per-day working hours and named time slots
 - Track execution lifecycle with event history
+- Support user-defined pinned scheduling time via `TaskOccurrence`
 - Avoid business logic — only data structure and derived properties
 - Fully decouple from NVDA and external I/O
 
@@ -54,6 +55,7 @@ Represents a scheduled instance of a task.
 - `task_id: str`
 - `scheduled_for: datetime`
 - `slot_name: Optional[str]` — name of the time slot used for this occurrence
+- `pinned_time: Optional[datetime]` — user-requested exact datetime (must be validated before use)
 
 ---
 
@@ -166,5 +168,6 @@ All models must support unit testing via:
 ✅ Compatible with TinyDB
 ✅ Priority and preferred slots included
 ✅ Retry interval dropped in favor of time-slot-based retry
+✅ `pinned_time` optionally supported in `TaskOccurrence`
 ✅ All fields serializable and cleanly structured
 ✅ Passes Pyright (strict) and Ruff

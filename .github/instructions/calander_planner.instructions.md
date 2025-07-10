@@ -14,6 +14,7 @@ This module provides logic to validate and compute **valid scheduling windows** 
 - Check if a task occurrence can be scheduled at a given time
 - Compute the next available slot for retries or recurrence
 - Respect per-day task caps and avoid time collisions
+- **Validate user-pinned times for manual scheduling intent**
 
 ---
 
@@ -51,18 +52,28 @@ class CalendarPlanner:
         priority: Optional[int] = None
     ) -> Optional[datetime]:
         """Find the next available valid datetime for scheduling."""
+
+    def is_pinned_time_valid(
+        self,
+        pinned_time: datetime,
+        scheduled_occurrences: list[TaskOccurrence],
+        working_hours: list[WorkingHours],
+        max_per_day: int
+    ) -> bool:
+        """Return True if a user-requested pinned datetime is eligible for scheduling."""
 ````
 
 ---
 
 ## ⚙️ Constraints
 
-* Day is defined by `proposed_time.date()`
+* Day is defined by `proposed_time.date()` or `pinned_time.date()`
 * Task count is limited per **calendar day**
 * Only times within that day’s `WorkingHours` are eligible
-* Time must match a valid `TimeSlot` (within hours)
+* Time must match a valid `TimeSlot` (for slot-based scheduling)
+* **Pinned time may bypass slot pool, but must respect working hours and caps**
 * No mutation of inputs
-* Search up to 14 days ahead (internal limit)
+* Search up to 14 days ahead (internal limit for `next_available_slot`)
 
 ---
 
@@ -101,11 +112,13 @@ User-defined preferred times, such as:
 * `working_hours`: allowed hours per weekday
 * `scheduled_occurrences`: already scheduled task times
 * `max_per_day`: how many tasks allowed per day
+* `pinned_time`: user-chosen datetime to validate (if applicable)
 
 ### Outputs
 
 * `is_slot_available`: `True` or `False`
 * `next_available_slot`: first available datetime or `None`
+* `is_pinned_time_valid`: `True` or `False` if the exact datetime is acceptable
 
 ---
 
@@ -141,6 +154,8 @@ Write all test cases in `tests/test_calendar_planner.py`.
 * Day filled → try next day
 * Skips holidays (no working hours entry)
 * Preference fallback — if `priority` affects slot ordering
+* **Pinned time valid → accepted**
+* **Pinned time invalid → rejected**
 
 Use deterministic slot pools and working hour configs in tests.
 
@@ -160,5 +175,6 @@ Use deterministic slot pools and working hour configs in tests.
 ✅ Implements all required methods
 ✅ Fully pure and side-effect free
 ✅ Respects working hours, time slots, and limits
+✅ `is_pinned_time_valid()` added for user-specified times
 ✅ Fully unit tested with slot edge cases
 ✅ Typed and linted (Ruff + Pyright strict)

@@ -14,6 +14,7 @@ This module defines the logic to **recover missed task executions** while respec
 - Evaluate whether retry or recurrence is possible based on task policy
 - Produce rescheduled occurrences that respect user constraints
 - Leverage `CalendarPlanner` and `TaskScheduler` for retry placement
+- **Skip rescheduling for pinned-time occurrences (user explicit intent)**
 
 ---
 
@@ -44,7 +45,11 @@ class RecoveryService:
         slot_pool: list[TimeSlot],
         max_per_day: int
     ) -> list[TaskOccurrence]:
-        """Return new retry or recurrence occurrences for missed tasks."""
+        """Return new retry or recurrence occurrences for missed tasks.
+        
+        Occurrences with `pinned_time` are treated as user-fixed and 
+        excluded from recovery retry/reschedule logic.
+        """
 ````
 
 ---
@@ -56,6 +61,7 @@ class RecoveryService:
 * If retry policy allows → generate retry with correct delay
 * Use `TaskScheduler` to calculate next occurrence or retry
 * Use `CalendarPlanner` to enforce per-day caps and availability
+* **Do not recover pinned-time occurrences**
 * Inputs must remain unmodified
 * Return only valid occurrences that fit user’s available time
 
@@ -95,6 +101,7 @@ Use Google-style for all public elements:
 * List all parameters and their meanings
 * Return value and assumptions
 * Mention immutability of inputs
+* Document that `pinned_time` disables recovery logic for that occurrence
 
 ---
 
@@ -110,6 +117,7 @@ Write all test cases in `tests/test_recovery_service.py`.
 * Task with retry + recurrence → only one scheduled
 * Retry limit exceeded → no action
 * Working hour/slot limits prevent scheduling → fallback or skip
+* **Pinned occurrence → ignored during recovery**
 
 Use `FakeClock` or inject `now` into test cases. Construct tasks, slots, hours manually.
 
@@ -129,6 +137,7 @@ Use `FakeClock` or inject `now` into test cases. Construct tasks, slots, hours m
 ✅ Implements `recover_missed_occurrences()` fully
 ✅ Leverages `TaskScheduler` and `CalendarPlanner`
 ✅ Respects user-configured limits and slot/working-hour windows
+✅ Ignores pinned-time occurrences during recovery
 ✅ 100% test coverage with edge cases
 ✅ Pure, typed, and deterministic
 ✅ Passes Ruff + Pyright strict

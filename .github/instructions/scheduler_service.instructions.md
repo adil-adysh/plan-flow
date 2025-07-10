@@ -15,6 +15,7 @@ This module implements core logic for **task scheduling, recurrence, retries**, 
 - Handle retries while respecting max limits and available user slots
 - Respect time slots, working hours, and per-day task caps
 - Produce fully deterministic, immutable outputs
+- **Honor optional user-pinned times during scheduling if valid**
 
 ---
 
@@ -52,7 +53,12 @@ class TaskScheduler:
         slot_pool: list[TimeSlot],
         max_per_day: int
     ) -> Optional[TaskOccurrence]:
-        """Generate the next recurrence occurrence for this task."""
+        """Generate the next recurrence occurrence for this task.
+        
+        If the task includes a valid `pinned_time`, return an occurrence
+        for that time. If the pinned time is invalid or missing, use 
+        recurrence rules and calendar logic to select the next slot.
+        """
 
     def reschedule_retry(
         self,
@@ -78,6 +84,7 @@ class TaskScheduler:
 * Return `None` if scheduling isn't possible
 * Prioritize preferred time slots for retry/recurrence scheduling
 * Tasks with `high` priority should be placed first in day when resolving conflicts
+* **Pinned time takes precedence if valid, but must pass calendar validation**
 
 ---
 
@@ -114,6 +121,7 @@ Each method must use Google-style docstrings and document:
 * Parameter explanations
 * Return values
 * Constraints (immutability, slot handling, fallback logic)
+* **Pinned-time support in `get_next_occurrence()` must be documented**
 
 ---
 
@@ -124,18 +132,16 @@ Write tests in `tests/test_scheduler_service.py`.
 ### Test Coverage
 
 * `is_due` with edge timestamps
-
 * `is_missed` when overdue but not done
-
 * `should_retry` for zero, partial, and full retries
-
 * `get_next_occurrence` with:
 
   * recurrence = None
   * recurrence = timedelta
   * no available slot for N days
+  * valid `pinned_time` → selected
+  * invalid `pinned_time` → fallback
   * varying working hours and slot preferences
-
 * `reschedule_retry` with:
 
   * retry interval vs next available slot
@@ -162,5 +168,6 @@ Use `freezegun` or inject `now` into all tests. Mock or construct `CalendarPlann
 ✅ Deterministic and testable in isolation
 ✅ Respects working hours, slot pool, and task caps
 ✅ Can return `None` if no valid slot
+✅ `get_next_occurrence()` supports valid `pinned_time`
 ✅ 100% unit tested with all logic branches
 ✅ Passes Pyright strict + Ruff
