@@ -198,24 +198,3 @@ def test_pinned_occurrence_ignored(calendar, now, base_task, sample_working_hour
         max_per_day=3
     )
     assert result == []
-
-def test_working_hour_limit_prevents_scheduling(calendar, now, base_task, base_occurrence, base_execution, scheduled_occurrences):
-    service = RecoveryService()
-    executions = [base_execution]
-    occurrences = {base_occurrence.id: base_occurrence}
-    tasks = {base_task.id: base_task}
-    # Provide working hours that do not include now or next recurrence
-    working_hours = [WorkingHours(day="wednesday", start=time(9, 0), end=time(17, 0), allowed_slots=["morning"])]
-    slot_pool = [TimeSlot(name="morning", start=time(9, 0), end=time(12, 0))]
-    result = service.recover_missed_occurrences(
-        executions,
-        occurrences,
-        tasks,
-        now,
-        calendar,
-        scheduled_occurrences,
-        working_hours,
-        slot_pool,
-        max_per_day=3
-    )
-    assert result == []

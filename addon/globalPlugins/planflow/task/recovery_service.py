@@ -74,7 +74,8 @@ class RecoveryService:
                     scheduled_occurrences,
                     working_hours,
                     slot_pool,
-                    max_per_day
+                    max_per_day,
+                    retries_remaining=execution.retries_remaining
                 )
                 if retry_occ is not None:
                     new_occurrences.append(retry_occ)
