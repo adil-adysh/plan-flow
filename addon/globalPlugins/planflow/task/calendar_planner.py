@@ -41,7 +41,7 @@ class CalendarPlanner:
         scheduled_occurrences: list[TaskOccurrence],
         max_per_day: int
     ) -> datetime | None:
-        """Return the next datetime where a slot is available for scheduling.
+        """Return the next datetime at midnight where a slot is available for scheduling.
 
         Args:
             after: The datetime after which to search for availability.
@@ -49,10 +49,14 @@ class CalendarPlanner:
             max_per_day: Maximum allowed tasks per day.
 
         Returns:
-            The next datetime with an available slot, or None if not found within the search window.
+            The next datetime at 00:00 with an available slot, or None if not found within the search window.
         """
-        for offset in range(1, self.SEARCH_WINDOW_DAYS + 1):
-            candidate = after + timedelta(days=offset)
-            if self.is_slot_available(candidate, scheduled_occurrences, max_per_day):
-                return candidate
+        start_date = after.date()
+        # If after is not at midnight, skip today
+        first_offset = 1 if after.time() > datetime.min.time() else 0
+        for offset in range(first_offset, self.SEARCH_WINDOW_DAYS):
+            candidate_date = start_date + timedelta(days=offset)
+            candidate_dt = datetime.combine(candidate_date, datetime.min.time())
+            if self.is_slot_available(candidate_dt, scheduled_occurrences, max_per_day):
+                return candidate_dt
         return None
