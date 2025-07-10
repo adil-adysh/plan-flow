@@ -1,0 +1,11 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"type": "shell",
+			"label": "pytest with PYTHONPATH for PlanFlow",
+			"command": "$env:PYTHONPATH='.'; pytest",
+			"group": "test"
+		}
+	]
+}

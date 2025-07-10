@@ -112,7 +112,7 @@ class TaskScheduler:
             slot_dt = base_time.replace(hour=slot.start.hour, minute=slot.start.minute, second=0, microsecond=0)
             if not (slot.start <= slot_dt.time() <= slot.end):
                 continue
-            if not calendar.is_slot_available(slot_dt, scheduled_occurrences, max_per_day):
+            if not calendar.is_slot_available(slot_dt, scheduled_occurrences, working_hours, max_per_day):
                 continue
             return TaskOccurrence(
                 id=f"{task.id}:{int(slot_dt.timestamp())}",
@@ -120,19 +120,27 @@ class TaskScheduler:
                 scheduled_for=slot_dt,
                 slot_name=slot.name,
             )
-        next_day = calendar.next_available_day(base_time, scheduled_occurrences, max_per_day)
-        if not next_day:
+        next_slot = calendar.next_available_slot(
+            after=base_time,
+            slot_pool=slot_pool,
+            scheduled_occurrences=scheduled_occurrences,
+            working_hours=working_hours,
+            max_per_day=max_per_day
+        )
+        if not next_slot:
             return None
-        for slot in preferred_slots:
-            slot_dt = next_day.replace(hour=slot.start.hour, minute=slot.start.minute, second=0, microsecond=0)
-            if not (slot.start <= slot_dt.time() <= slot.end):
-                continue
-            return TaskOccurrence(
-                id=f"{task.id}:{int(slot_dt.timestamp())}",
-                task_id=task.id,
-                scheduled_for=slot_dt,
-                slot_name=slot.name,
-            )
+        # Find the slot name for the returned datetime
+        slot_name = None
+        for slot in slot_pool:
+            if slot.start == next_slot.time():
+                slot_name = slot.name
+                break
+        return TaskOccurrence(
+            id=f"{task.id}:{int(next_slot.timestamp())}",
+            task_id=task.id,
+            scheduled_for=next_slot,
+            slot_name=slot_name,
+        )
         return None
 
     def reschedule_retry(
@@ -187,7 +195,7 @@ class TaskScheduler:
             slot_dt = base_time.replace(hour=slot.start.hour, minute=slot.start.minute, second=0, microsecond=0)
             if not (slot.start <= slot_dt.time() <= slot.end):
                 continue
-            if not calendar.is_slot_available(slot_dt, scheduled_occurrences, max_per_day):
+            if not calendar.is_slot_available(slot_dt, scheduled_occurrences, working_hours, max_per_day):
                 continue
             return TaskOccurrence(
                 id=f"{occurrence.task_id}:retry:{int(slot_dt.timestamp())}",
@@ -195,17 +203,25 @@ class TaskScheduler:
                 scheduled_for=slot_dt,
                 slot_name=slot.name,
             )
-        next_day = calendar.next_available_day(base_time, scheduled_occurrences, max_per_day)
-        if not next_day:
+        next_slot = calendar.next_available_slot(
+            after=base_time,
+            slot_pool=slot_pool,
+            scheduled_occurrences=scheduled_occurrences,
+            working_hours=working_hours,
+            max_per_day=max_per_day
+        )
+        if not next_slot:
             return None
-        for slot in preferred_slots:
-            slot_dt = next_day.replace(hour=slot.start.hour, minute=slot.start.minute, second=0, microsecond=0)
-            if not (slot.start <= slot_dt.time() <= slot.end):
-                continue
-            return TaskOccurrence(
-                id=f"{occurrence.task_id}:retry:{int(slot_dt.timestamp())}",
-                task_id=occurrence.task_id,
-                scheduled_for=slot_dt,
-                slot_name=slot.name,
-            )
+        # Find the slot name for the returned datetime
+        slot_name = None
+        for slot in slot_pool:
+            if slot.start == next_slot.time():
+                slot_name = slot.name
+                break
+        return TaskOccurrence(
+            id=f"{occurrence.task_id}:retry:{int(next_slot.timestamp())}",
+            task_id=occurrence.task_id,
+            scheduled_for=next_slot,
+            slot_name=slot_name,
+        )
         return None

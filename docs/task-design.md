@@ -52,115 +52,202 @@ It must support:
 
 ## 1. ✅ Domain Models
 
+
 ### 1.1 `TaskDefinition`
 
 Represents the **user-configured** task template.
 
 ```python
-class TaskDefinition(BaseModel):
+@dataclass(frozen=True, slots=True)
+class TaskDefinition:
     id: str
     title: str
-    description: Optional[str]
-    link: Optional[str]
+    description: str | None
+    link: str | None
     created_at: datetime
-    recurrence: Optional[timedelta]
+    recurrence: object | None  # typically timedelta, or None
+    priority: Literal["low", "medium", "high"]
+    preferred_slots: list[str]  # names of preferred TimeSlots
     retry_policy: RetryPolicy
 ```
 
 ---
+
 
 ### 1.2 `TaskOccurrence`
 
 Generated from a `TaskDefinition`—this represents one **scheduled due time**.
 
 ```python
-class TaskOccurrence(BaseModel):
+@dataclass(frozen=True, slots=True)
+class TaskOccurrence:
     id: str
     task_id: str
     scheduled_for: datetime
+    slot_name: str | None  # name of the time slot used for this occurrence
 ```
 
 ---
+
 
 ### 1.3 `TaskExecution`
 
 Tracks **runtime state** of a scheduled task occurrence.
 
 ```python
-class TaskExecution(BaseModel):
+@dataclass(frozen=True, slots=True)
+class TaskExecution:
     occurrence_id: str
     state: Literal["pending", "done", "missed", "cancelled"]
     retries_remaining: int
-    history: List[TaskEvent]
+    history: list[TaskEvent]
+
+    @property
+    def is_reschedulable(self) -> bool: ...
+    @property
+    def retry_count(self) -> int: ...
+    @property
+    def last_event_time(self) -> datetime | None: ...
 ```
 
 ---
+
 
 ### 1.4 `RetryPolicy`
 
 Defines task-specific retry behavior.
 
 ```python
-class RetryPolicy(BaseModel):
+@dataclass(frozen=True, slots=True)
+class RetryPolicy:
     max_retries: int
-    retry_interval: timedelta
-    speak_on_retry: bool = True
 ```
 
 ---
+
 
 ### 1.5 `TaskEvent`
 
 Immutable log entry. Used in `TaskExecution.history`.
 
 ```python
-class TaskEvent(BaseModel):
-    event: Literal["triggered", "missed", "completed", "rescheduled"]
+@dataclass(frozen=True, slots=True)
+class TaskEvent:
+    event: Literal["triggered", "missed", "rescheduled", "completed"]
     timestamp: datetime
+```
+### 1.6 `TimeSlot`
+
+Represents a named time window for task delivery.
+
+```python
+@dataclass(frozen=True, slots=True)
+class TimeSlot:
+    name: str
+    start: time
+    end: time
+```
+
+### 1.7 `WorkingHours`
+
+Defines allowed scheduling hours per weekday.
+
+```python
+@dataclass(frozen=True, slots=True)
+class WorkingHours:
+    day: Literal["monday", ..., "sunday"]
+    start: time
+    end: time
+    allowed_slots: list[str]
 ```
 
 ---
 
 ## 2. ⚙️ Pure Logic Layer
 
+
 ### 2.1 `TaskScheduler`
 
-Handles due checks, recurrence generation, retry/rescheduling.
+Handles due checks, recurrence generation, retry/rescheduling, and slot-aware scheduling.
 
 ```python
 class TaskScheduler:
     def is_due(self, occurrence: TaskOccurrence, now: datetime) -> bool
-    def get_next_occurrence(self, task: TaskDefinition, from_time: datetime) -> TaskOccurrence
-    def should_reschedule(self, execution: TaskExecution) -> bool
+    def is_missed(self, occurrence: TaskOccurrence, now: datetime) -> bool
+    def should_retry(self, execution: TaskExecution) -> bool
+    def get_next_occurrence(
+        self,
+        task: TaskDefinition,
+        from_time: datetime,
+        calendar: CalendarPlanner,
+        scheduled_occurrences: list[TaskOccurrence],
+        working_hours: list[WorkingHours],
+        slot_pool: list[TimeSlot],
+        max_per_day: int
+    ) -> TaskOccurrence | None
+    def reschedule_retry(
+        self,
+        occurrence: TaskOccurrence,
+        policy: RetryPolicy,
+        now: datetime,
+        calendar: CalendarPlanner,
+        scheduled_occurrences: list[TaskOccurrence],
+        working_hours: list[WorkingHours],
+        slot_pool: list[TimeSlot],
+        max_per_day: int
+    ) -> TaskOccurrence | None
 ```
 
 ---
 
-### 2.2 `RecoveryEngine`
 
-Handles tasks missed while NVDA was off.
+### 2.2 `RecoveryService`
+
+Handles tasks missed while NVDA was off, using CalendarPlanner and TaskScheduler.
 
 ```python
-class RecoveryEngine:
-    def recover_missed_tasks(
+class RecoveryService:
+    def recover_missed_occurrences(
         self,
-        now: datetime,
         executions: list[TaskExecution],
-        scheduler: TaskScheduler,
+        occurrences: dict[str, TaskOccurrence],
+        tasks: dict[str, TaskDefinition],
+        now: datetime,
+        calendar: CalendarPlanner,
+        scheduled_occurrences: list[TaskOccurrence],
+        working_hours: list[WorkingHours],
+        slot_pool: list[TimeSlot],
+        max_per_day: int
     ) -> list[TaskOccurrence]
 ```
 
 ---
 
-### 2.3 `CalendarCapacityPlanner`
 
-Limits tasks per day.
+### 2.3 `CalendarPlanner`
+
+Enforces working hours, slot preferences, and per-day task limits. Computes valid scheduling windows and next available slots.
 
 ```python
-class CalendarCapacityPlanner:
-    def can_schedule(self, date: datetime.date) -> bool
-    def register(self, occurrence: TaskOccurrence)
-    def find_next_available_day(self, start: date) -> date
+class CalendarPlanner:
+    def is_slot_available(
+        self,
+        proposed_time: datetime,
+        scheduled_occurrences: list[TaskOccurrence],
+        working_hours: list[WorkingHours],
+        max_per_day: int,
+        slot_pool: list[TimeSlot] | None = None
+    ) -> bool
+    def next_available_slot(
+        self,
+        after: datetime,
+        slot_pool: list[TimeSlot],
+        scheduled_occurrences: list[TaskOccurrence],
+        working_hours: list[WorkingHours],
+        max_per_day: int,
+        priority: int | None = None
+    ) -> datetime | None
+    # Only searches up to 7 days ahead for available slots
 ```
 
 ---
@@ -169,57 +256,32 @@ class CalendarCapacityPlanner:
 
 TinyDB-backed. Split responsibilities for clarity.
 
-### 3.1 `TaskRepository`
 
-Handles storage of user-configured tasks.
+### 3.1 `ExecutionRepository`
 
-```python
-class TaskRepository:
-    def get_all(): list[TaskDefinition]
-    def save(task: TaskDefinition)
-```
-
----
-
-### 3.2 `OccurrenceRepository`
-
-Stores scheduled occurrences.
-
-```python
-class OccurrenceRepository:
-    def get_all(): list[TaskOccurrence]
-    def save(occurrence: TaskOccurrence)
-```
-
----
-
-### 3.3 `ExecutionRepository`
-
-Stores execution state per occurrence.
+Handles storage of user-configured tasks, occurrences, and executions using TinyDB.
 
 ```python
 class ExecutionRepository:
-    def get_all(): list[TaskExecution]
-    def update(execution: TaskExecution)
+    def add_task(self, task: TaskDefinition) -> None
+    def get_task(self, task_id: str) -> TaskDefinition | None
+    def list_tasks(self) -> list[TaskDefinition]
+    def add_occurrence(self, occ: TaskOccurrence) -> None
+    def list_occurrences(self) -> list[TaskOccurrence]
+    def add_execution(self, exec: TaskExecution) -> None
+    def list_executions(self) -> list[TaskExecution]
 ```
 
 ---
 
-### 3.4 `CalendarIndex`
 
-Tracks how many tasks are scheduled per day.
-
-```python
-class CalendarIndex:
-    def count(date: datetime.date) -> int
-    def add(occurrence: TaskOccurrence)
-```
 
 ---
+
 
 ## 4. 🧪 Testing Strategy
 
-All logic is designed to be **pure**, **deterministic**, and **testable**.
+All logic is designed to be **pure**, **deterministic**, and **testable**. All models and logic are covered by pytest-based unit tests, with edge cases for slot search, per-day caps, and missed/retry logic. No NVDA or real-time dependencies are present in tests.
 
 ### Tools
 
@@ -302,26 +364,18 @@ class PlanFlowEngine:
 
 ---
 
+
 ## 📦 Recommended File Structure
 
 ```
 planflow/
-├── models/
-│   ├── definition.py
-│   ├── occurrence.py
-│   ├── execution.py
-│   ├── policy.py
-│   └── event.py
-├── logic/
-│   ├── scheduler.py
-│   ├── recovery.py
-│   └── planner.py
-├── persistence/
-│   ├── tasks.py
-│   ├── occurrences.py
-│   ├── executions.py
-│   └── calendar.py
-├── nvda/
+├── task/
+│   ├── task_model.py
+│   ├── calendar_planner.py
+│   ├── scheduler_service.py
+│   ├── recovery_service.py
+│   ├── execution_repository.py
+├── nvda_adapter/
 │   ├── runner.py
 │   └── output.py
 ├── core/

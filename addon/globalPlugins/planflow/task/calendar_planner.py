@@ -17,7 +17,7 @@ class CalendarPlanner:
     Enforces working hours, slot preferences, and per-day task limits.
     """
 
-    SEARCH_WINDOW_DAYS: int = 14
+    SEARCH_WINDOW_DAYS: int = 7
 
     def is_slot_available(
         self,
@@ -91,10 +91,10 @@ class CalendarPlanner:
             priority: Optional integer to affect slot ordering (lower = higher priority).
 
         Returns:
-            The first available datetime matching all constraints, or None if not found within 14 days.
+            The first available datetime matching all constraints, or None if not found within 7 days.
 
         Fallback:
-            Returns None if no valid slot is found within the search window.
+            Returns None if no valid slot is found within the 7-day search window.
         """
         search_start = after + timedelta(minutes=1)
         for day_offset in range(self.SEARCH_WINDOW_DAYS):
