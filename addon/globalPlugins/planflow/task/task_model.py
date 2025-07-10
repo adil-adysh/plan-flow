@@ -45,6 +45,7 @@ class TaskDefinition:
         priority (Literal["low", "medium", "high"]): Task priority.
         preferred_slots (list[str]): Names of preferred TimeSlots.
         retry_policy (RetryPolicy): Retry policy for missed tasks.
+        pinned_time (Optional[datetime]): User-requested exact datetime for scheduling.
     """
     id: str
     title: str
@@ -55,6 +56,7 @@ class TaskDefinition:
     priority: Literal["low", "medium", "high"]
     preferred_slots: list[str]
     retry_policy: RetryPolicy
+    pinned_time: datetime | None = None
 
 
 @dataclass(frozen=True, slots=True)

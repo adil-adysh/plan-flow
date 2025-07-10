@@ -74,32 +74,25 @@ class TaskScheduler:
         slot_pool: list[TimeSlot],
         max_per_day: int
     ) -> TaskOccurrence | None:
-        """Generate the next recurrence occurrence for this task.
+        """Generate the next occurrence for this task, supporting pinned time and recurrence.
 
         If the task includes a valid `pinned_time`, return an occurrence for that time
         (if it passes calendar validation). If the pinned time is invalid or missing,
         use recurrence rules and calendar logic to select the next slot.
-
-        Args:
-            task: The TaskDefinition to schedule.
-            from_time: The datetime to calculate from.
-            calendar: CalendarPlanner for conflict detection.
-            scheduled_occurrences: All current task occurrences.
-            working_hours: List of WorkingHours for user availability.
-            slot_pool: List of preferred TimeSlots.
-            max_per_day: Max task occurrences per calendar day.
-
-        Returns:
-            A new TaskOccurrence if recurrence is possible, else None.
-
-        Constraints:
-            - No mutation of inputs.
-            - Must honor per-day caps, user time slots, and working hours.
-            - Return None if scheduling isn't possible.
-            - Prioritize preferred time slots and high priority tasks.
-            - If a valid pinned_time is present, it takes precedence.
         """
-        # No pinned_time logic: only recurrence and slot/working hours are used for scheduling
+        # 1. Pinned time logic
+        pinned_time = getattr(task, "pinned_time", None)
+        if pinned_time is not None:
+            if calendar.is_pinned_time_valid(pinned_time, scheduled_occurrences, working_hours, max_per_day):
+                return TaskOccurrence(
+                    id=f"{task.id}:pinned:{int(pinned_time.timestamp())}",
+                    task_id=task.id,
+                    scheduled_for=pinned_time,
+                    slot_name=None,
+                    pinned_time=pinned_time,
+                )
+            else:
+                return None
         # 2. Standard recurrence logic
         if not task.recurrence:
             return None
@@ -152,7 +145,6 @@ class TaskScheduler:
             slot_name=slot_name,
             pinned_time=None,
         )
-        return None
 
     def reschedule_retry(
         self,

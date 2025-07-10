@@ -1,3 +1,41 @@
+from datetime import datetime
+from addon.globalPlugins.planflow.task.calendar_planner import CalendarPlanner
+from addon.globalPlugins.planflow.task.scheduler_service import TaskScheduler
+from addon.globalPlugins.planflow.task.task_model import WorkingHours, TimeSlot, TaskDefinition, RetryPolicy
+def test_pinned_time_scheduling(
+    now: datetime,
+    calendar: CalendarPlanner,
+    scheduler: TaskScheduler,
+    working_hours: list[WorkingHours],
+    slot_pool: list[TimeSlot],
+    max_per_day: int,
+) -> None:
+    """Test that a task with a valid pinned_time is scheduled exactly at that time."""
+    pinned_time = datetime(2025, 1, 13, 9, 0, 0)  # Monday 9:00 AM
+    task = TaskDefinition(
+        id="t-pinned",
+        title="Pinned Task",
+        description="desc",
+        link=None,
+        created_at=now,
+        recurrence=None,
+        priority="medium",
+        preferred_slots=["morning"],
+        retry_policy=RetryPolicy(max_retries=0),
+        pinned_time=pinned_time,
+    )
+    occurrence = scheduler.get_next_occurrence(
+        task=task,
+        from_time=now,
+        calendar=calendar,
+        scheduled_occurrences=[],
+        working_hours=working_hours,
+        slot_pool=slot_pool,
+        max_per_day=max_per_day,
+    )
+    assert occurrence is not None
+    assert occurrence.scheduled_for == pinned_time
+    assert occurrence.pinned_time == pinned_time
 """Integration tests for ExecutionRepository, CalendarPlanner, and TaskScheduler flows."""
 
 import pytest
