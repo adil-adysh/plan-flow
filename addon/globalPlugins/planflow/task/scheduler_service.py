@@ -76,6 +76,10 @@ class TaskScheduler:
     ) -> TaskOccurrence | None:
         """Generate the next recurrence occurrence for this task.
 
+        If the task includes a valid `pinned_time`, return an occurrence for that time
+        (if it passes calendar validation). If the pinned time is invalid or missing,
+        use recurrence rules and calendar logic to select the next slot.
+
         Args:
             task: The TaskDefinition to schedule.
             from_time: The datetime to calculate from.
@@ -93,8 +97,26 @@ class TaskScheduler:
             - Must honor per-day caps, user time slots, and working hours.
             - Return None if scheduling isn't possible.
             - Prioritize preferred time slots and high priority tasks.
+            - If a valid pinned_time is present, it takes precedence.
         """
-        if not task.recurrence or not isinstance(task.recurrence, timedelta):
+        # 1. Handle pinned_time if present and valid
+        pinned_time = getattr(task, "pinned_time", None)
+        if pinned_time is not None:
+            if calendar.is_slot_available(pinned_time, scheduled_occurrences, working_hours, max_per_day, slot_pool=slot_pool):
+                slot_name = None
+                for slot in slot_pool:
+                    if slot.start <= pinned_time.time() <= slot.end:
+                        slot_name = slot.name
+                        break
+                return TaskOccurrence(
+                    id=f"{task.id}:{int(pinned_time.timestamp())}",
+                    task_id=task.id,
+                    scheduled_for=pinned_time,
+                    slot_name=slot_name,
+                    pinned_time=pinned_time,
+                )
+        # 2. Standard recurrence logic
+        if not task.recurrence:
             return None
         base_time = from_time + task.recurrence
         weekday = base_time.strftime("%A").lower()
@@ -104,21 +126,25 @@ class TaskScheduler:
         allowed_slot_names: set[str] = set()
         for wh in wh_for_day:
             allowed_slot_names.update(wh.allowed_slots)
-        preferred_slots = [s for s in slot_pool if s.name in allowed_slot_names and s.name in task.preferred_slots]
+        is_high_priority = getattr(task, "priority", None) == "high"
+        preferred_slots = [s for s in slot_pool if s.name in allowed_slot_names and s.name in getattr(task, "preferred_slots", [])]
         if not preferred_slots:
             preferred_slots = [s for s in slot_pool if s.name in allowed_slot_names]
         preferred_slots.sort(key=lambda s: s.start)
+        if is_high_priority:
+            preferred_slots = sorted(preferred_slots, key=lambda s: s.start)
         for slot in preferred_slots:
             slot_dt = base_time.replace(hour=slot.start.hour, minute=slot.start.minute, second=0, microsecond=0)
             if not (slot.start <= slot_dt.time() <= slot.end):
                 continue
-            if not calendar.is_slot_available(slot_dt, scheduled_occurrences, working_hours, max_per_day):
+            if not calendar.is_slot_available(slot_dt, scheduled_occurrences, working_hours, max_per_day, slot_pool=slot_pool):
                 continue
             return TaskOccurrence(
                 id=f"{task.id}:{int(slot_dt.timestamp())}",
                 task_id=task.id,
                 scheduled_for=slot_dt,
                 slot_name=slot.name,
+                pinned_time=None,
             )
         next_slot = calendar.next_available_slot(
             after=base_time,
@@ -129,7 +155,6 @@ class TaskScheduler:
         )
         if not next_slot:
             return None
-        # Find the slot name for the returned datetime
         slot_name = None
         for slot in slot_pool:
             if slot.start == next_slot.time():
@@ -140,6 +165,7 @@ class TaskScheduler:
             task_id=task.id,
             scheduled_for=next_slot,
             slot_name=slot_name,
+            pinned_time=None,
         )
         return None
 
@@ -177,8 +203,6 @@ class TaskScheduler:
         """
         # For retry, schedule at now + retry interval (assume 1 hour if not specified)
         retry_interval = getattr(policy, "retry_interval", timedelta(hours=1))
-        if not isinstance(retry_interval, timedelta):
-            retry_interval = timedelta(hours=1)
         base_time = now + retry_interval
         weekday = base_time.strftime("%A").lower()
         wh_for_day: list[WorkingHours] = [wh for wh in working_hours if wh.day == weekday]
@@ -195,13 +219,14 @@ class TaskScheduler:
             slot_dt = base_time.replace(hour=slot.start.hour, minute=slot.start.minute, second=0, microsecond=0)
             if not (slot.start <= slot_dt.time() <= slot.end):
                 continue
-            if not calendar.is_slot_available(slot_dt, scheduled_occurrences, working_hours, max_per_day):
+            if not calendar.is_slot_available(slot_dt, scheduled_occurrences, working_hours, max_per_day, slot_pool=slot_pool):
                 continue
             return TaskOccurrence(
                 id=f"{occurrence.task_id}:retry:{int(slot_dt.timestamp())}",
                 task_id=occurrence.task_id,
                 scheduled_for=slot_dt,
                 slot_name=slot.name,
+                pinned_time=None,
             )
         next_slot = calendar.next_available_slot(
             after=base_time,
@@ -212,7 +237,6 @@ class TaskScheduler:
         )
         if not next_slot:
             return None
-        # Find the slot name for the returned datetime
         slot_name = None
         for slot in slot_pool:
             if slot.start == next_slot.time():
@@ -223,5 +247,6 @@ class TaskScheduler:
             task_id=occurrence.task_id,
             scheduled_for=next_slot,
             slot_name=slot_name,
+            pinned_time=None,
         )
         return None

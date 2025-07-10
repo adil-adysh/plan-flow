@@ -55,6 +55,7 @@ def sample_occurrence() -> TaskOccurrence:
         task_id="task-1",
         scheduled_for=datetime(2025, 7, 10, 9, 0, 0),
         slot_name="morning",
+        pinned_time=None,
     )
 
 @pytest.fixture
@@ -65,12 +66,14 @@ def scheduled_occurrences() -> list[TaskOccurrence]:
             task_id="task-1",
             scheduled_for=datetime(2025, 7, 10, 9, 0, 0),
             slot_name="morning",
+            pinned_time=None,
         ),
         TaskOccurrence(
             id="occ-2",
             task_id="task-2",
             scheduled_for=datetime(2025, 7, 10, 13, 0, 0),
             slot_name="afternoon",
+            pinned_time=None,
         ),
     ]
 
@@ -177,6 +180,7 @@ def test_get_next_occurrence_no_available_slot(
             task_id=f"task-{i}",
             scheduled_for=next_day.replace(hour=slot.start.hour, minute=slot.start.minute),
             slot_name=slot.name,
+            pinned_time=None,
         )
         for i, slot in enumerate(slot_pool, 1)
     ]
@@ -263,6 +267,7 @@ def test_reschedule_retry_task_cap_overflow(
             task_id=f"task-{i}",
             scheduled_for=retry_day.replace(hour=slot.start.hour, minute=slot.start.minute),
             slot_name=slot.name,
+            pinned_time=None,
         )
         for i, slot in enumerate(slot_pool, 1)
     ]
@@ -281,14 +286,76 @@ def test_reschedule_retry_multiple_tasks_same_slot(
 ) -> None:
     scheduler = TaskScheduler()
     # Simulate two tasks competing for 'morning' slot
+
     scheduled_occurrences = [
         TaskOccurrence(
             id="occ-2",
             task_id="task-2",
             scheduled_for=datetime(2025, 7, 10, 8, 0, 0),
             slot_name="morning",
+            pinned_time=None,
         )
     ]
+    policy = RetryPolicy(max_retries=2)
+    now = datetime(2025, 7, 10, 7, 0, 0)
+    occ = scheduler.reschedule_retry(
+        sample_occurrence, policy, now, calendar, scheduled_occurrences, working_hours, slot_pool, max_per_day=2
+    )
+    assert occ is None or occ.slot_name in ["morning", "afternoon"]
+
+def test_get_next_occurrence_with_valid_pinned_time(
+    sample_task_def: TaskDefinition,
+    calendar: CalendarPlanner,
+    scheduled_occurrences: list[TaskOccurrence],
+    working_hours: list[WorkingHours],
+    slot_pool: list[TimeSlot],
+) -> None:
+    scheduler = TaskScheduler()
+    # Add a valid pinned_time (within working hours and slot)
+    pinned_time = datetime(2025, 7, 11, 8, 0, 0)  # Friday, 8:00, matches 'morning'
+    task = replace(sample_task_def, pinned_time=pinned_time)
+    occ = scheduler.get_next_occurrence(
+        task, datetime(2025, 7, 10, 9, 0, 0), calendar, scheduled_occurrences, working_hours, slot_pool, 3
+    )
+    assert occ is not None
+    assert occ.pinned_time == pinned_time
+    assert occ.scheduled_for == pinned_time
+
+def test_get_next_occurrence_with_invalid_pinned_time_fallbacks_to_recurrence(
+    sample_task_def: TaskDefinition,
+    calendar: CalendarPlanner,
+    scheduled_occurrences: list[TaskOccurrence],
+    working_hours: list[WorkingHours],
+    slot_pool: list[TimeSlot],
+) -> None:
+    scheduler = TaskScheduler()
+    # Add an invalid pinned_time (outside working hours)
+    pinned_time = datetime(2025, 7, 11, 6, 0, 0)  # Friday, 6:00, not in any slot
+    task = replace(sample_task_def, pinned_time=pinned_time)
+    occ = scheduler.get_next_occurrence(
+        task, datetime(2025, 7, 10, 9, 0, 0), calendar, scheduled_occurrences, working_hours, slot_pool, 3
+    )
+    # Should not use pinned_time, should fallback to recurrence logic
+    assert occ is not None
+    assert occ.pinned_time is None or occ.scheduled_for != pinned_time
+
+def test_get_next_occurrence_high_priority_earliest_slot(
+    sample_task_def: TaskDefinition,
+    calendar: CalendarPlanner,
+    scheduled_occurrences: list[TaskOccurrence],
+    working_hours: list[WorkingHours],
+    slot_pool: list[TimeSlot],
+    sample_occurrence: TaskOccurrence,
+) -> None:
+    scheduler = TaskScheduler()
+    # High priority should pick earliest slot
+    task = replace(sample_task_def, priority="high", preferred_slots=["morning", "afternoon"])
+    from_time = datetime(2025, 7, 10, 9, 0, 0)
+    occ = scheduler.get_next_occurrence(
+        task, from_time, calendar, scheduled_occurrences, working_hours, slot_pool, 3
+    )
+    assert occ is not None
+    assert occ.slot_name == "morning"
     policy = RetryPolicy(max_retries=2)
     now = datetime(2025, 7, 10, 7, 0, 0)
     occ = scheduler.reschedule_retry(
@@ -300,7 +367,4 @@ def test_reschedule_retry_multiple_tasks_same_slot(
 Covers due/missed detection, recurrence, retry logic, and rescheduling.
 """
 
-import pytest
 from datetime import datetime, timedelta
-from addon.globalPlugins.planflow.task.scheduler_service import TaskScheduler
-from addon.globalPlugins.planflow.task.task_model import TaskDefinition, TaskOccurrence, RetryPolicy
