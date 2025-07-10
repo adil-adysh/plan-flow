@@ -99,22 +99,7 @@ class TaskScheduler:
             - Prioritize preferred time slots and high priority tasks.
             - If a valid pinned_time is present, it takes precedence.
         """
-        # 1. Handle pinned_time if present and valid
-        pinned_time = getattr(task, "pinned_time", None)
-        if pinned_time is not None:
-            if calendar.is_slot_available(pinned_time, scheduled_occurrences, working_hours, max_per_day, slot_pool=slot_pool):
-                slot_name = None
-                for slot in slot_pool:
-                    if slot.start <= pinned_time.time() <= slot.end:
-                        slot_name = slot.name
-                        break
-                return TaskOccurrence(
-                    id=f"{task.id}:{int(pinned_time.timestamp())}",
-                    task_id=task.id,
-                    scheduled_for=pinned_time,
-                    slot_name=slot_name,
-                    pinned_time=pinned_time,
-                )
+        # No pinned_time logic: only recurrence and slot/working hours are used for scheduling
         # 2. Standard recurrence logic
         if not task.recurrence:
             return None
