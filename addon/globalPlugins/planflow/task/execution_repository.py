@@ -27,22 +27,18 @@ def _serialize_timedelta(td: timedelta | None) -> float | None:
 def _deserialize_timedelta(val: float | None) -> timedelta | None:
     return timedelta(seconds=val) if val is not None else None
 
+
 def _serialize_retry_policy(rp: RetryPolicy) -> dict[str, t.Any]:
     return {
         "max_retries": rp.max_retries,
-        "retry_interval": _serialize_timedelta(rp.retry_interval),
-        "speak_on_retry": rp.speak_on_retry,
     }
 
+
 def _deserialize_retry_policy(data: dict[str, t.Any]) -> RetryPolicy:
-    interval = _deserialize_timedelta(data["retry_interval"])
-    if interval is None:
-        raise ValueError("retry_interval must not be None")
     return RetryPolicy(
-        max_retries=data["max_retries"],
-        retry_interval=interval,
-        speak_on_retry=data.get("speak_on_retry", True),
+        max_retries=data["max_retries"]
     )
+
 
 def _serialize_task_definition(task: TaskDefinition) -> dict[str, t.Any]:
     return {
@@ -52,8 +48,12 @@ def _serialize_task_definition(task: TaskDefinition) -> dict[str, t.Any]:
         "link": task.link,
         "created_at": _serialize_datetime(task.created_at),
         "recurrence": _serialize_timedelta(task.recurrence),
+        "priority": task.priority,
+        "preferred_slots": task.preferred_slots,
         "retry_policy": _serialize_retry_policy(task.retry_policy),
     }
+
+
 
 def _deserialize_task_definition(data: dict[str, t.Any]) -> TaskDefinition:
     return TaskDefinition(
@@ -63,21 +63,30 @@ def _deserialize_task_definition(data: dict[str, t.Any]) -> TaskDefinition:
         link=data.get("link"),
         created_at=_deserialize_datetime(data["created_at"]),
         recurrence=_deserialize_timedelta(data.get("recurrence")),
+        priority=data.get("priority", "medium"),
+        preferred_slots=data.get("preferred_slots", []),
         retry_policy=_deserialize_retry_policy(data["retry_policy"]),
     )
+
 
 def _serialize_task_occurrence(occ: TaskOccurrence) -> dict[str, t.Any]:
     return {
         "id": occ.id,
         "task_id": occ.task_id,
         "scheduled_for": _serialize_datetime(occ.scheduled_for),
+        "slot_name": occ.slot_name,
+        "pinned_time": _serialize_datetime(occ.pinned_time) if occ.pinned_time is not None else None,
     }
+
+
 
 def _deserialize_task_occurrence(data: dict[str, t.Any]) -> TaskOccurrence:
     return TaskOccurrence(
         id=data["id"],
         task_id=data["task_id"],
         scheduled_for=_deserialize_datetime(data["scheduled_for"]),
+        slot_name=data.get("slot_name", None),
+        pinned_time=_deserialize_datetime(data["pinned_time"]) if data.get("pinned_time") is not None else None,
     )
 
 def _serialize_task_event(ev: TaskEvent) -> dict[str, t.Any]:

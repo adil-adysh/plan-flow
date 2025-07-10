@@ -8,12 +8,12 @@ from addon.globalPlugins.planflow.task.execution_repository import ExecutionRepo
 from addon.globalPlugins.planflow.task.task_model import TaskDefinition, TaskOccurrence, TaskExecution, RetryPolicy, TaskEvent
 from dataclasses import replace
 
-def repo() -> ExecutionRepository:
+
 @pytest.fixture
 def repo() -> ExecutionRepository:
     return ExecutionRepository(TinyDB(storage=MemoryStorage))
 
-def sample_task() -> TaskDefinition:
+
 @pytest.fixture
 def sample_task() -> TaskDefinition:
     return TaskDefinition(
@@ -28,7 +28,7 @@ def sample_task() -> TaskDefinition:
         retry_policy=RetryPolicy(max_retries=3),
     )
 
-def sample_occurrence(sample_task: TaskDefinition) -> TaskOccurrence:
+
 @pytest.fixture
 def sample_occurrence(sample_task: TaskDefinition) -> TaskOccurrence:
     return TaskOccurrence(
@@ -39,7 +39,7 @@ def sample_occurrence(sample_task: TaskDefinition) -> TaskOccurrence:
         pinned_time=None,
     )
 
-def sample_execution(sample_occurrence: TaskOccurrence) -> TaskExecution:
+
 @pytest.fixture
 def sample_execution(sample_occurrence: TaskOccurrence) -> TaskExecution:
     return TaskExecution(
