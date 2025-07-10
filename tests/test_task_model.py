@@ -42,6 +42,7 @@ def sample_occurrence() -> TaskOccurrence:
         task_id="task-1",
         scheduled_for=datetime(2025, 7, 11, 9, 0, 0),
         slot_name="morning",
+        pinned_time=None,
     )
 
 @pytest.fixture
@@ -76,6 +77,7 @@ def test_task_occurrence_fields(sample_occurrence: TaskOccurrence):
     assert sample_occurrence.task_id == "task-1"
     assert sample_occurrence.scheduled_for == datetime(2025, 7, 11, 9, 0, 0)
     assert sample_occurrence.slot_name == "morning"
+    assert sample_occurrence.pinned_time is None
 
 def test_task_event_fields(sample_event: TaskEvent):
     assert sample_event.event == "triggered"
@@ -141,6 +143,17 @@ def test_serialization_roundtrip(sample_task_def: TaskDefinition, sample_occurre
         assert isinstance(d, dict)
         for v in d.values():
             assert not callable(v)
+
+def test_task_occurrence_with_pinned_time():
+    dt = datetime(2025, 7, 11, 10, 0, 0)
+    occ = TaskOccurrence(
+        id="occ-2",
+        task_id="task-2",
+        scheduled_for=dt,
+        slot_name="afternoon",
+        pinned_time=dt,
+    )
+    assert occ.pinned_time == dt
 
 def test_task_event_enum():
     allowed = ("triggered", "missed", "rescheduled", "completed")

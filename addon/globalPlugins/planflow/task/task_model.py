@@ -6,7 +6,7 @@ This module defines core data models for the PlanFlow task scheduler. All models
 
 from __future__ import annotations
 from dataclasses import dataclass, field
-from datetime import datetime, time
+from datetime import datetime, time, timedelta
 from typing import Literal
 
 
@@ -38,10 +38,10 @@ class TaskDefinition:
     Attributes:
         id (str): Unique identifier for the task.
         title (str): Task title.
-        description (str | None): Optional description.
-        link (str | None): Local file or URL.
+        description (Optional[str]): Optional description.
+        link (Optional[str]): Local file or URL.
         created_at (datetime): Creation timestamp.
-        recurrence (object | None): Optional recurrence interval.
+        recurrence (Optional[timedelta]): Optional recurrence interval.
         priority (Literal["low", "medium", "high"]): Task priority.
         preferred_slots (list[str]): Names of preferred TimeSlots.
         retry_policy (RetryPolicy): Retry policy for missed tasks.
@@ -51,7 +51,7 @@ class TaskDefinition:
     description: str | None
     link: str | None
     created_at: datetime
-    recurrence: object | None  # Use object for forward compatibility; update if timedelta is reintroduced
+    recurrence: timedelta | None
     priority: Literal["low", "medium", "high"]
     preferred_slots: list[str]
     retry_policy: RetryPolicy
@@ -65,12 +65,14 @@ class TaskOccurrence:
         id (str): Unique identifier for this occurrence.
         task_id (str): The parent task's id.
         scheduled_for (datetime): When this occurrence is scheduled.
-        slot_name (str | None): Name of the time slot used for this occurrence.
+        slot_name (Optional[str]): Name of the time slot used for this occurrence.
+        pinned_time (Optional[datetime]): User-requested exact datetime (must be validated before use).
     """
     id: str
     task_id: str
     scheduled_for: datetime
     slot_name: str | None
+    pinned_time: datetime | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -83,6 +85,7 @@ class TaskEvent:
     """
     event: Literal["triggered", "missed", "rescheduled", "completed"]
     timestamp: datetime
+
 
 
 @dataclass(frozen=True, slots=True)
@@ -98,7 +101,7 @@ class TaskExecution:
     occurrence_id: str
     state: Literal["pending", "done", "missed", "cancelled"]
     retries_remaining: int
-    history: list["TaskEvent"] = field(default_factory=list)
+    history: list[TaskEvent] = field(default_factory=list)
 
     @property
     def is_reschedulable(self) -> bool:
