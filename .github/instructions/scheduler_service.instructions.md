@@ -1,31 +1,30 @@
-
 ---
 applyTo: "addon/globalPlugins/planflow/task/scheduler_service.py"
 ---
 
-# Module Instructions — Scheduler Service
+# Module Instructions — Scheduler Service (v2)
 
-This module implements the **core logic** for task scheduling, recurrence, and retry management. It uses data models from `task_model.py` and must remain **pure**, **testable**, and **NVDA-independent**.
+This module implements core logic for **task scheduling, recurrence, retries**, and **slot-aware scheduling decisions**. It must remain pure, testable, and decoupled from NVDA and TinyDB.
 
 ---
 
 ## ✨ Goals
 
-- Determine whether tasks are due, missed, or expired
-- Generate new `TaskOccurrence` from `TaskDefinition` (recurrence)
-- Decide whether to reschedule missed tasks
-- Enforce retry limits using `RetryPolicy`
-- Derive the next available day via constraints (delegated to calendar)
+- Determine whether a task is due, missed, or expired
+- Compute the next valid `TaskOccurrence` for a recurring task
+- Handle retries while respecting max limits and available user slots
+- Respect time slots, working hours, and per-day task caps
+- Produce fully deterministic, immutable outputs
 
 ---
 
 ## 📦 Module Contents
 
-Implement a single public class:
+Implement the main scheduling engine:
 
 ### ✅ `TaskScheduler`
 
-Encapsulates scheduling logic and policies.
+This class handles recurrence, retrying, and determining task states.
 
 ---
 
@@ -35,83 +34,133 @@ Encapsulates scheduling logic and policies.
 class TaskScheduler:
 
     def is_due(self, occurrence: TaskOccurrence, now: datetime) -> bool:
-        """Check if a task occurrence is currently due."""
+        """Return True if the task is currently due."""
 
     def is_missed(self, occurrence: TaskOccurrence, now: datetime) -> bool:
-        """Determine if an occurrence has passed and was not marked complete."""
-
-    def get_next_occurrence(self, task: TaskDefinition, from_time: datetime) -> Optional[TaskOccurrence]:
-        """Return the next scheduled occurrence based on recurrence, or None."""
+        """Return True if scheduled time has passed and not marked done."""
 
     def should_retry(self, execution: TaskExecution) -> bool:
-        """Return True if the task should be retried, based on retry policy."""
+        """Check if task is eligible for retry based on RetryPolicy."""
 
-    def reschedule_retry(self, occurrence: TaskOccurrence, policy: RetryPolicy, now: datetime) -> TaskOccurrence:
-        """Return a new occurrence based on retry_interval from now."""
+    def get_next_occurrence(
+        self,
+        task: TaskDefinition,
+        from_time: datetime,
+        calendar: CalendarPlanner,
+        scheduled_occurrences: list[TaskOccurrence],
+        working_hours: list[WorkingHours],
+        slot_pool: list[TimeSlot],
+        max_per_day: int
+    ) -> Optional[TaskOccurrence]:
+        """Generate the next recurrence occurrence for this task."""
+
+    def reschedule_retry(
+        self,
+        occurrence: TaskOccurrence,
+        policy: RetryPolicy,
+        now: datetime,
+        calendar: CalendarPlanner,
+        scheduled_occurrences: list[TaskOccurrence],
+        working_hours: list[WorkingHours],
+        slot_pool: list[TimeSlot],
+        max_per_day: int
+    ) -> Optional[TaskOccurrence]:
+        """Generate a retry occurrence based on retry policy and availability."""
 ````
 
 ---
 
 ## ⚙️ Constraints
 
-* Must not mutate inputs — always return new objects
-* No time reads — accept `now: datetime` as input
-* All recurrence logic must honor `task.recurrence`
-* Retry logic must respect `max_retries`, `retry_interval`
+* No real-time calls (use `now` parameter only)
+* Must honor per-day caps, user time slots, and working hours
+* Always return **new objects** — do not mutate inputs
+* Return `None` if scheduling isn't possible
+* Prioritize preferred time slots for retry/recurrence scheduling
+* Tasks with `high` priority should be placed first in day when resolving conflicts
 
 ---
 
 ## 📚 Requirements
 
+### Inputs
+
+* All models from `task_model.py` (fully typed)
+* `CalendarPlanner` handles conflict detection
+* `WorkingHours` defines user availability
+* `TimeSlot` defines preferred times for task delivery
+* `max_per_day`: max task occurrences per calendar day
+
+### Outputs
+
+* Return `TaskOccurrence` or `None` (retry or next recurrence)
+* Must be deterministic and side-effect free
+
+---
+
 ### Type Annotations
 
-* All parameters and return types must be annotated
-* Use `Optional[...]`, `Literal[...]` and `-> None` explicitly
-* Use `TaskDefinition`, `TaskOccurrence`, `TaskExecution`, `RetryPolicy` from `task_model.py`
+* All inputs/outputs must be fully typed
+* Use `Optional`, `Literal`, `datetime`, and model classes
+* Use `-> None` explicitly where relevant
+
+---
 
 ### Docstrings
 
-Each method must use Google-style docstrings:
+Each method must use Google-style docstrings and document:
 
-* Describe behavior
-* List parameters
-* List return values
-* Mention immutability where relevant
+* What the method does
+* Parameter explanations
+* Return values
+* Constraints (immutability, slot handling, fallback logic)
 
 ---
 
 ## 🧪 Testing
 
-This module must be 100% unit testable. All behavior must be covered in `test_scheduler_service.py`.
+Write tests in `tests/test_scheduler_service.py`.
 
-### Required Test Coverage:
+### Test Coverage
 
-* `is_due` with before/after edge cases
-* `is_missed` logic based on time
-* `get_next_occurrence` with recurrence = None / timedelta
-* `should_retry` based on retry count
-* `reschedule_retry` returns new task with correct time offset
+* `is_due` with edge timestamps
 
-Use `FakeClock` or `freezegun` in tests (but do not depend on real `datetime.now()` inside this module).
+* `is_missed` when overdue but not done
+
+* `should_retry` for zero, partial, and full retries
+
+* `get_next_occurrence` with:
+
+  * recurrence = None
+  * recurrence = timedelta
+  * no available slot for N days
+  * varying working hours and slot preferences
+
+* `reschedule_retry` with:
+
+  * retry interval vs next available slot
+  * task cap overflow
+  * multiple tasks competing for same slot
+
+Use `freezegun` or inject `now` into all tests. Mock or construct `CalendarPlanner` + `WorkingHours`.
 
 ---
 
 ## 🔒 Exclusions
 
-❌ No NVDA API access
-❌ No persistence/database access
-❌ No speech or I/O side effects
-❌ No direct time reads (`datetime.now()`)
+❌ No NVDA APIs
+❌ No DB access
+❌ No `datetime.now()` calls
+❌ No print/logging or speech
+❌ No I/O of any kind
 
 ---
 
 ## ✅ Completion Criteria
 
-✅ All public methods defined and documented
-✅ Fully type-annotated, pure functions
-✅ No side effects or mutable input modification
-✅ Independent of NVDA and external modules
-✅ Passes Pyright + Ruff
-✅ Supports 100% offline test coverage
-
----
+✅ Fully type-annotated and pure
+✅ Deterministic and testable in isolation
+✅ Respects working hours, slot pool, and task caps
+✅ Can return `None` if no valid slot
+✅ 100% unit tested with all logic branches
+✅ Passes Pyright strict + Ruff

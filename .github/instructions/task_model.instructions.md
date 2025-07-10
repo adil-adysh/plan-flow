@@ -2,151 +2,122 @@
 applyTo: "addon/globalPlugins/planflow/task/task_model.py"
 ---
 
-# Module Instructions — Task Model (v2)
+# Module Instructions — Task Model
 
-This module defines the **core persistent models** for the PlanFlow scheduler system. These models must be logic-free, testable, and compatible with TinyDB.
+This module defines the **core data models** used by the PlanFlow task scheduler. These models represent the structure and state of scheduled tasks, retries, and user-defined timing preferences. They must remain **pure**, **testable**, and **JSON-serializable** for TinyDB.
 
 ---
 
 ## ✨ Goals
 
-- Represent user-defined tasks, retry policies, preferences, and scheduling metadata
-- Support recurrence, retries, and missed task recovery
-- Enable time slot–based scheduling, per-day working hours, and per-task priorities
-- Provide data for execution history, tracking, and conflict resolution
+- Represent tasks, retries, time slots, and execution status
+- Enable per-day working hours and named time slots
+- Track execution lifecycle with event history
+- Avoid business logic — only data structure and derived properties
+- Fully decouple from NVDA and external I/O
 
 ---
 
-## 📦 Module Contents
-
-Define the following models using `@dataclass(frozen=True, slots=True)`:
-
----
+## 📦 Data Models to Implement
 
 ### ✅ `TaskDefinition`
 
-A user-configured task template.
+Represents a user-defined task.
 
-```python
-@dataclass(frozen=True, slots=True)
-class TaskDefinition:
-    id: str
-    title: str
-    description: Optional[str]
-    link: Optional[str]
-    created_at: datetime
-    recurrence: Optional[timedelta]
-    retry_policy: RetryPolicy
-    priority: Literal["low", "medium", "high"]
-    preferred_slots: list[str]
-````
-
-* `preferred_slots` must match user-defined `Slot.id`s
-* `priority` affects scheduling order (high-priority tasks are scheduled first)
-* Must be serializable via `asdict()` for TinyDB
+- `id: str`
+- `title: str`
+- `description: Optional[str]`
+- `link: Optional[str]` — local file or URL
+- `created_at: datetime`
+- `recurrence: Optional[timedelta]`
+- `priority: Literal["low", "medium", "high"]`
+- `preferred_slots: list[str]` — names of `TimeSlot`s the task prefers
+- `retry_policy: RetryPolicy`
 
 ---
 
 ### ✅ `RetryPolicy`
 
-Rules for retrying a failed or missed task.
+Defines the user's configuration for retrying missed tasks.
 
-```python
-@dataclass(frozen=True, slots=True)
-class RetryPolicy:
-    max_retries: int
-    retry_interval: Optional[timedelta]
-    speak_on_retry: bool
-```
+- `max_retries: int`
 
-* If `retry_interval` is None, retries are scheduled in next available user slot
+✅ Note: No retry interval or speech flags — retries are handled by re-scheduling in future valid time slots.
 
 ---
 
 ### ✅ `TaskOccurrence`
 
-A scheduled occurrence of a `TaskDefinition`.
+Represents a scheduled instance of a task.
 
-```python
-@dataclass(frozen=True, slots=True)
-class TaskOccurrence:
-    id: str
-    task_id: str
-    scheduled_for: datetime
-```
+- `id: str`
+- `task_id: str`
+- `scheduled_for: datetime`
+- `slot_name: Optional[str]` — name of the time slot used for this occurrence
 
 ---
 
 ### ✅ `TaskExecution`
 
-Runtime state of an individual occurrence.
+Tracks the runtime execution of a `TaskOccurrence`.
+
+- `occurrence_id: str`
+- `state: Literal["pending", "done", "missed", "cancelled"]`
+- `retries_remaining: int`
+- `history: list[TaskEvent]`
+
+With derived properties:
 
 ```python
-@dataclass(frozen=True, slots=True)
-class TaskExecution:
-    occurrence_id: str
-    state: Literal["pending", "done", "missed", "cancelled"]
-    retries_remaining: int
-    history: list[TaskEvent]
-```
+@property
+def is_reschedulable(self) -> bool: ...
 
-Must include:
+@property
+def retry_count(self) -> int: ...
 
-* `@property def is_reschedulable() -> bool`
-* `@property def retry_count() -> int`
-* `@property def last_event_time() -> Optional[datetime]`
+@property
+def last_event_time(self) -> Optional[datetime]: ...
+````
 
 ---
 
 ### ✅ `TaskEvent`
 
-Append-only audit log entry for task execution history.
+A log entry in a task’s execution lifecycle.
 
-```python
-@dataclass(frozen=True, slots=True)
-class TaskEvent:
-    event: Literal["triggered", "missed", "rescheduled", "completed"]
-    timestamp: datetime
-```
+* `event: Literal["triggered", "missed", "rescheduled", "completed"]`
+* `timestamp: datetime`
 
 ---
 
 ### ✅ `TimeSlot`
 
-Represents a daily time window defined by the user.
+Represents a named time window for task delivery.
 
-```python
-@dataclass(frozen=True, slots=True)
-class TimeSlot:
-    id: str
-    label: str
-    start_time: time
-    end_time: time
-```
+* `name: str` — must match values used in `preferred_slots`
+* `start: time`
+* `end: time`
 
 ---
 
 ### ✅ `WorkingHours`
 
-Represents allowed working periods per day of week.
+Defines allowed scheduling hours per weekday.
 
-```python
-@dataclass(frozen=True, slots=True)
-class WorkingHours:
-    day: Literal["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
-    start_time: time
-    end_time: time
-```
-
-These restrict when tasks may be scheduled.
+* `day: Literal["monday", ..., "sunday"]`
+* `start: time`
+* `end: time`
+* `allowed_slots: list[str]` — names of `TimeSlot`s allowed on that day
 
 ---
 
 ## ⚙️ Constraints
 
-* No logic beyond derived properties (`is_reschedulable`, etc.)
-* JSON-serializable with `asdict()` and `datetime.isoformat()` for all times
-* All models should be safely storable in TinyDB
+* Use `@dataclass(frozen=True, slots=True)` for all models
+* All models must be **pure** and **side-effect free**
+* All fields must be JSON-serializable
+* Datetimes are timezone-naive (for now)
+* Avoid nested logic or complex method bodies
 
 ---
 
@@ -154,43 +125,46 @@ These restrict when tasks may be scheduled.
 
 ### Type Annotations
 
-* Use full type annotations on all fields and properties
-* Use `Literal`, `Optional`, and `Union` where applicable
-* Avoid any runtime-dependent fields (e.g. callbacks, I/O handles)
+* Use full type hints for all fields and return values
+* Use `Optional[...]`, `Literal[...]`, and `list[...]` appropriately
+* Prefer immutability where possible
 
 ### Docstrings
 
-Each class must include a Google-style docstring:
+All classes and methods must use **Google-style** docstrings to describe:
 
-* Purpose and usage
-* Field documentation (in `Attributes:` block)
-* Usage examples (if needed)
+* Purpose
+* Parameters and their types
+* Return values (if applicable)
 
 ---
 
 ## 🧪 Testing
 
-Tests will be written in `tests/test_task_model.py`. All models must:
+All models must support unit testing via:
 
-* Be instantiable with sample data
-* Be serializable via `dataclasses.asdict`
-* Validate derived property logic
+* Manual instantiation in `pytest`
+* Serialization with `dataclasses.asdict(...)`
+* Derived properties tested in isolation
+* Tests located in `tests/test_task_model.py`
 
 ---
 
 ## 🔒 Exclusions
 
-❌ No scheduling, retry logic, or time computations
-❌ No TinyDB access (just structure)
-❌ No speech, file I/O, or NVDA dependencies
+❌ No NVDA APIs
+❌ No scheduling logic
+❌ No time lookups or `datetime.now()`
+❌ No I/O, storage, or real-time side effects
 
 ---
 
 ## ✅ Completion Criteria
 
-✅ Models for task definition, retry, execution, slotting, and scheduling
-✅ All types and docstrings present
-✅ TinyDB-compatible and serializable
-✅ Frozen, immutable, side-effect free
-✅ 100% testable, type-safe, logic-light
-✅ Passes Pyright (strict) + Ruff linting
+✅ All models defined with frozen dataclasses and `slots=True`
+✅ Fully type-annotated and documented
+✅ Compatible with TinyDB
+✅ Priority and preferred slots included
+✅ Retry interval dropped in favor of time-slot-based retry
+✅ All fields serializable and cleanly structured
+✅ Passes Pyright (strict) and Ruff

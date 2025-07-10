@@ -4,126 +4,115 @@ applyTo: "addon/globalPlugins/planflow/task/execution_repository.py"
 
 # Module Instructions — Execution Repository
 
-This module defines a **TinyDB-backed storage layer** for managing task-related data: definitions, scheduled occurrences, and execution history. It provides safe CRUD APIs for use by logic layers (scheduler, recovery, etc.).
+This module defines a **TinyDB-backed storage layer** for managing task-related data: task definitions, scheduled occurrences, and execution history. It provides clean, testable APIs to interact with persistent state.
 
 ---
 
 ## ✨ Goals
 
 - Persist and retrieve `TaskDefinition`, `TaskOccurrence`, and `TaskExecution`
-- Provide atomic, type-safe, and pure storage methods
-- Fully decouple logic and storage concerns
-- Enable isolated unit testing with in-memory or mock DB
+- Provide type-safe, logic-free CRUD interfaces
+- Remain decoupled from scheduling, retry, or UI logic
+- Allow seamless in-memory use for unit testing
 
 ---
 
-## 📦 Module Contents
-
-Implement a public class:
+## 📦 Class to Implement
 
 ### ✅ `ExecutionRepository`
 
-Backed by TinyDB, this manages all task-related records by `id`.
+A single class for storage access.
 
----
-
-### Public Methods
+#### Public Methods:
 
 ```python
 class ExecutionRepository:
 
-    def add_task(self, task: TaskDefinition) -> None:
-        """Store a new task definition."""
+    def add_task(self, task: TaskDefinition) -> None: ...
+    def get_task(self, task_id: str) -> Optional[TaskDefinition]: ...
+    def list_tasks(self) -> list[TaskDefinition]: ...
 
-    def get_task(self, task_id: str) -> Optional[TaskDefinition]:
-        """Fetch a task by ID."""
+    def add_occurrence(self, occ: TaskOccurrence) -> None: ...
+    def list_occurrences(self) -> list[TaskOccurrence]: ...
 
-    def list_tasks(self) -> list[TaskDefinition]:
-        """Return all task definitions."""
-
-    def add_occurrence(self, occ: TaskOccurrence) -> None:
-        """Store a task occurrence."""
-
-    def list_occurrences(self) -> list[TaskOccurrence]:
-        """Return all known occurrences."""
-
-    def add_execution(self, exec: TaskExecution) -> None:
-        """Store a new task execution record."""
-
-    def list_executions(self) -> list[TaskExecution]:
-        """Return all executions."""
+    def add_execution(self, exec: TaskExecution) -> None: ...
+    def list_executions(self) -> list[TaskExecution]: ...
 ````
 
 ---
 
 ## ⚙️ Constraints
 
-* All data must be JSON-serializable via `dataclasses.asdict()`
-* Must support pluggable storage (file-based or in-memory for testing)
-* Keep logic pure: no side effects outside TinyDB ops
-* Handle record collisions gracefully (idempotency where useful)
+* Use `TinyDB` with `.table("tasks")`, `.table("occurrences")`, `.table("executions")`
+* Store only `@dataclass` values converted via `asdict()`
+* Handle ID-based uniqueness but allow overwrites (idempotency)
+* Store timestamps as `datetime`, not strings
+* No logic — just persistence and retrieval
 
 ---
 
-## 📚 Requirements
+## 🧩 Requirements
 
-### TinyDB
+### Input Types
 
-Use the following structure:
+* Must accept only typed models (`TaskDefinition`, `TaskOccurrence`, `TaskExecution`)
+* Must validate uniqueness by `id` field in each model
 
-| Table Name      | Stores           |
-| --------------- | ---------------- |
-| `"tasks"`       | `TaskDefinition` |
-| `"occurrences"` | `TaskOccurrence` |
-| `"executions"`  | `TaskExecution`  |
+### Output Types
 
-Use `.table("tasks")` etc. for organization.
+* Return deserialized instances from JSON-compatible dicts
+* Type signatures must match return values exactly
 
 ---
 
-### Type Annotations
+## ✅ Type Annotations
 
-* All methods must include full type hints
-* Use `Optional[...]`, `-> None`, and `list[Model]` signatures
+* All arguments and return types must be fully annotated
+* Use `Optional[...]`, `list[...]`, `-> None`, etc.
+* Avoid use of `Any` or `dict` in public interfaces
 
 ---
 
-### Docstrings
+## 📝 Docstrings
 
-Each method and class must include docstrings:
+Each method must include a Google-style docstring with:
 
-* Purpose of the method
-* Parameter definitions
-* Return value
-* Side-effect summary
+* Purpose
+* Parameters and types
+* Return values and format
+* Any side effects (e.g. overwrite, in-place update)
 
 ---
 
 ## 🧪 Testing
 
+All storage operations must be testable.
+
 Write tests in `tests/test_execution_repository.py` with:
 
-* `MemoryStorage` (in-memory DB backend)
-* Pytest fixtures to set up and tear down DB state
-* Unit tests for add/get/list across all types
-* Serialization/deserialization coverage for model integrity
+* `TinyDB(storage=MemoryStorage)` as test backend
+* Test each method independently
+* Include roundtrip tests (store → read → compare)
+* Confirm model compatibility and ID consistency
 
 ---
 
 ## 🔒 Exclusions
 
-❌ No business logic (scheduling, retries)
-❌ No NVDA API access
-❌ No direct JSON file management (TinyDB handles it)
-❌ No `print()`, logging, or speech output
+❌ No scheduling logic
+❌ No NVDA APIs
+❌ No time logic
+❌ No cross-table joins
+❌ No schema migration logic
 
 ---
 
 ## ✅ Completion Criteria
 
-✅ All CRUD methods implemented for 3 entities
-✅ Fully typed and documented
-✅ Compatible with TinyDB and MemoryStorage
-✅ No NVDA or scheduling logic mixed in
-✅ 100% testable via `pytest`
-✅ Lint/type-check clean (Ruff + Pyright strict)
+✅ Fully typed and documented methods
+✅ Stores and retrieves each model correctly
+✅ 100% test coverage in isolated tests
+✅ All I/O confined to TinyDB
+✅ Works with both real file and memory backends
+✅ Ruff + Pyright clean
+✅ Logic-free and stable

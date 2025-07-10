@@ -2,18 +2,18 @@
 applyTo: "addon/globalPlugins/planflow/task/recovery_service.py"
 ---
 
-# Module Instructions — Recovery Service
+# Module Instructions — Recovery Service (v2)
 
-This module defines the logic to detect and recover **missed or overdue task executions**. It works in coordination with the `TaskScheduler` and models from `task_model.py`.
+This module defines the logic to **recover missed task executions** while respecting recurrence, retry policy, working hours, and time slots. It must remain pure and testable.
 
 ---
 
 ## ✨ Goals
 
-- Recover tasks missed while NVDA was inactive or scheduling was paused
-- Determine which missed tasks should be retried or skipped
-- Generate appropriate retry or recurrence occurrences
-- Respect user-defined retry policies and per-day limits (delegated to planner)
+- Detect and recover tasks missed while NVDA was inactive
+- Evaluate whether retry or recurrence is possible based on task policy
+- Produce rescheduled occurrences that respect user constraints
+- Leverage `CalendarPlanner` and `TaskScheduler` for retry placement
 
 ---
 
@@ -23,7 +23,7 @@ Implement a single public class:
 
 ### ✅ `RecoveryService`
 
-Encapsulates logic for analyzing missed tasks and suggesting next steps.
+This encapsulates analysis of missed tasks and generation of next valid occurrences.
 
 ---
 
@@ -38,22 +38,26 @@ class RecoveryService:
         occurrences: dict[str, TaskOccurrence],
         tasks: dict[str, TaskDefinition],
         now: datetime,
+        calendar: CalendarPlanner,
+        scheduled_occurrences: list[TaskOccurrence],
+        working_hours: list[WorkingHours],
+        slot_pool: list[TimeSlot],
+        max_per_day: int
     ) -> list[TaskOccurrence]:
-        """Recover retry or recurrence for missed tasks.
-
-        Returns a list of new TaskOccurrences that should be scheduled next.
-        """
+        """Return new retry or recurrence occurrences for missed tasks."""
 ````
 
 ---
 
 ## ⚙️ Constraints
 
-* Only recover tasks with state "missed" or "pending" and `scheduled_for < now`
-* If recurrence is enabled, generate the next occurrence
-* If retries remain, reschedule based on retry interval
-* Use helper methods from `TaskScheduler`
-* Do **not** modify inputs — return new `TaskOccurrence`s only
+* Only recover tasks with state `"missed"` or `"pending"` and `scheduled_for < now`
+* If recurrence is enabled → generate next scheduled occurrence
+* If retry policy allows → generate retry with correct delay
+* Use `TaskScheduler` to calculate next occurrence or retry
+* Use `CalendarPlanner` to enforce per-day caps and availability
+* Inputs must remain unmodified
+* Return only valid occurrences that fit user’s available time
 
 ---
 
@@ -61,65 +65,70 @@ class RecoveryService:
 
 ### Inputs
 
-* `executions`: All known executions (including missed)
-* `occurrences`: Dict of occurrence\_id → TaskOccurrence
-* `tasks`: Dict of task\_id → TaskDefinition
-* `now`: Logical clock (no real-time reading)
+* `executions`: all known execution records
+* `occurrences`: dict of occurrence\_id → TaskOccurrence
+* `tasks`: dict of task\_id → TaskDefinition
+* `now`: logical current time
+* `calendar`: calendar planner for availability checks
+* `working_hours`: active time spans for each weekday
+* `slot_pool`: user-preferred time slots
+* `max_per_day`: allowed task count per day
 
 ### Outputs
 
-* A list of new `TaskOccurrence`s to schedule
+* List of new `TaskOccurrence`s (unsaved) ready to be scheduled
 
 ---
 
 ### Type Annotations
 
-* Full annotations for all parameters and return types
-* Use `Literal[...]`, `Optional[...]`, and custom model classes
+* Fully annotate all parameters and return values
+* Use `Optional`, `Literal`, `list[Model]`, and `-> None` consistently
 
 ---
 
 ### Docstrings
 
-Use Google-style docstrings for:
+Use Google-style for all public elements:
 
-* Class and method descriptions
-* Parameter explanation
-* Return value meaning
-* Note that returned occurrences are unsaved
+* Describe the function
+* List all parameters and their meanings
+* Return value and assumptions
+* Mention immutability of inputs
 
 ---
 
 ## 🧪 Testing
 
-All logic must be unit testable with `pytest`.
+Write all test cases in `tests/test_recovery_service.py`.
 
-**Scenarios to cover:**
+### Test Scenarios
 
-* Missed task with retries available → reschedule retry
-* Missed task with recurrence only → schedule next recurring occurrence
-* Retry limit exceeded → no reschedule
-* Multiple missed tasks handled correctly
-* Ensure no mutation of input data
+* Missed task with retries available → successful retry scheduled
+* Retry fails due to no slots → not returned
+* Task with recurrence → next valid slot selected
+* Task with retry + recurrence → only one scheduled
+* Retry limit exceeded → no action
+* Working hour/slot limits prevent scheduling → fallback or skip
 
-Use `FakeClock` or pass `now: datetime` into test cases.
+Use `FakeClock` or inject `now` into test cases. Construct tasks, slots, hours manually.
 
 ---
 
 ## 🔒 Exclusions
 
 ❌ No NVDA API usage
-❌ No actual database or storage access
-❌ No state mutation (only return new objects)
-❌ No print/logging or file I/O
+❌ No I/O, database, or speech output
+❌ No real-time system access
+❌ No mutation of passed-in arguments
 
 ---
 
 ## ✅ Completion Criteria
 
-✅ Implements `recover_missed_occurrences()`
-✅ Fully pure, typed, and deterministic
-✅ Proper use of `TaskScheduler` methods
-✅ Tested with all major branches and edge cases
-✅ Compatible with TinyDB serialization
-✅ Pyright strict + Ruff clean
+✅ Implements `recover_missed_occurrences()` fully
+✅ Leverages `TaskScheduler` and `CalendarPlanner`
+✅ Respects user-configured limits and slot/working-hour windows
+✅ 100% test coverage with edge cases
+✅ Pure, typed, and deterministic
+✅ Passes Ruff + Pyright strict
