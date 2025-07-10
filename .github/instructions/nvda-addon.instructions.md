@@ -55,14 +55,17 @@ These are project-wide guidelines to help AI and humans generate consistent, tes
 
 ---
 
+
 ## Type Annotations — Required
 
-All implementation code **must** include full type annotations:
+All implementation code **must** include full type annotations using Python 3.11+ syntax:
 
 - Every **function and method** must specify parameter and return types.
 - Use `-> None` explicitly when a function returns nothing.
-- Use `Optional[...]` where `None` is a valid value.
-- Use `Literal`, `Union`, `TypedDict`, or `Annotated` as needed for clarity.
+- Use `str | None` instead of `Optional[str]` (and similar for other types).
+- Use `Literal`, `Union`, `TypedDict`, or `Annotated` as needed for clarity, using modern union syntax (e.g., `int | str`).
+
+> **Note:** All code must target Python 3.11 or newer. Do not use legacy `Optional[...]` or `Union[...]` syntax.
 
 ---
 

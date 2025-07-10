@@ -108,8 +108,11 @@ class TaskScheduler:
 ### Type Annotations
 
 * All inputs/outputs must be fully typed
-* Use `Optional`, `Literal`, `datetime`, and model classes
+* Use Python 3.11+ syntax: `str | None` instead of `Optional[str]`, `int | str` instead of `Union[int, str]`, etc.
+* Use `Literal`, `datetime`, and model classes as needed
 * Use `-> None` explicitly where relevant
+
+> **Note:** Do not use legacy `Optional[...]` or `Union[...]` syntax.
 
 ---
 

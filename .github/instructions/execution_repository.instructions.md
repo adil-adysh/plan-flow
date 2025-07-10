@@ -65,11 +65,14 @@ class ExecutionRepository:
 
 ---
 
-## ✅ Type Annotations
+##  Type Annotations
 
 * All arguments and return types must be fully annotated
-* Use `Optional[...]`, `list[...]`, `-> None`, etc.
+* Use Python 3.11+ syntax: `str | None` instead of `Optional[str]`, `int | str` instead of `Union[int, str]`, etc.
+* Use `list[...]`, `-> None`, etc.
 * Avoid use of `Any` or `dict` in public interfaces
+
+> **Note:** Do not use legacy `Optional[...]` or `Union[...]` syntax.
 
 ---
 

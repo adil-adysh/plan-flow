@@ -89,7 +89,10 @@ class RecoveryService:
 ### Type Annotations
 
 * Fully annotate all parameters and return values
-* Use `Optional`, `Literal`, `list[Model]`, and `-> None` consistently
+* Use Python 3.11+ syntax: `str | None` instead of `Optional[str]`, `int | str` instead of `Union[int, str]`, etc.
+* Use `Literal`, `list[Model]`, and `-> None` as needed
+
+> **Note:** Do not use legacy `Optional[...]` or `Union[...]` syntax.
 
 ---
 

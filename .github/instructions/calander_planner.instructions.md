@@ -125,8 +125,11 @@ User-defined preferred times, such as:
 ### Type Annotations
 
 * All parameters and return types must be typed
-* Use `Optional[...]`, `Literal[...]`, `list[Model]`
+* Use Python 3.11+ syntax: `str | None` instead of `Optional[str]`, `int | str` instead of `Union[int, str]`, etc.
+* Use `Literal`, `list[Model]` as needed
 * No timezone-aware datetime logic (use naive datetime only)
+
+> **Note:** Do not use legacy `Optional[...]` or `Union[...]` syntax.
 
 ---
 

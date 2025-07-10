@@ -50,6 +50,10 @@
 ## Conventions & Best Practices
 
 - **Python 3.11.2+ required.**
+
+**Type Hints:**
+- Use Python 3.11+ type hint syntax throughout (e.g., `str | None` instead of `Optional[str]`).
+- Do not use legacy `Optional[...]` or `Union[...]` syntax.
 - **Docstrings:**  
   - All non-trivial functions/classes must have docstrings.
 - **Composition over inheritance.**

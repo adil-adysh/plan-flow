@@ -147,6 +147,16 @@ Avoid catching exceptions unless testing failures
 
 ---
 
+
+## Type Annotations
+
+* All tests must use full type annotations for fixtures and inputs
+* Use Python 3.11+ syntax: `str | None` instead of `Optional[str]`, `int | str` instead of `Union[int, str]`, etc.
+* Use `list[...]`, `datetime`, and model types as needed
+* Fixtures must return concrete types (`-> list[WorkingHours]`, etc.)
+
+> **Note:** Do not use legacy `Optional[...]` or `Union[...]` syntax.
+
 ## Linting & Type Checking
 
 All tests must pass:

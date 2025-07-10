@@ -128,8 +128,11 @@ Defines allowed scheduling hours per weekday.
 ### Type Annotations
 
 * Use full type hints for all fields and return values
-* Use `Optional[...]`, `Literal[...]`, and `list[...]` appropriately
+* Use Python 3.11+ syntax: `str | None` instead of `Optional[str]`, `int | str` instead of `Union[int, str]`, etc.
+* Use `Literal`, `list[...]` as needed
 * Prefer immutability where possible
+
+> **Note:** Do not use legacy `Optional[...]` or `Union[...]` syntax.
 
 ### Docstrings
 

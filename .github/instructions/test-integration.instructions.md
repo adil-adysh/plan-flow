@@ -114,8 +114,11 @@ def test_fallback_when_pinned_time_conflicts():
 ## ⚙️ Type Annotations
 
 * All tests must use full type annotations for fixtures and inputs
-* Use `Optional[...]`, `list[...]`, `datetime`, and model types
+* Use Python 3.11+ syntax: `str | None` instead of `Optional[str]`, `int | str` instead of `Union[int, str]`, etc.
+* Use `list[...]`, `datetime`, and model types as needed
 * Fixtures must return concrete types (`-> list[WorkingHours]`, etc.)
+
+> **Note:** Do not use legacy `Optional[...]` or `Union[...]` syntax.
 
 ---
 
