@@ -1,4 +1,9 @@
 
+
+from __future__ import annotations
+from dataclasses import dataclass
+from .task_model import TaskOccurrence, WorkingHours, TimeSlot
+from datetime import datetime, timedelta
 """
 CalendarPlanner: Computes valid scheduling windows for tasks, enforcing working hours, slot preferences, and per-day limits.
 
@@ -6,12 +11,24 @@ This module provides logic to validate and compute valid scheduling windows for 
 """
 
 
-from __future__ import annotations
-from datetime import datetime, timedelta
-from .task_model import TaskOccurrence, WorkingHours, TimeSlot
+# Configuration dataclass for calendar settings
+@dataclass(frozen=True, slots=True)
+class CalendarConfig:
+    """Holds calendar configuration for scheduling."""
+    working_hours: list[WorkingHours]
+    slot_pool: list[TimeSlot]
+    max_per_day: int
 
 
 class CalendarPlanner:
+
+    def get_config(self) -> CalendarConfig:
+        """Return the current calendar configuration for scheduling logic."""
+        return CalendarConfig(
+            working_hours=getattr(self, "working_hours", []),
+            slot_pool=getattr(self, "slot_pool", []),
+            max_per_day=getattr(self, "max_per_day", 1),
+        )
     """Encapsulates availability logic for scheduling tasks based on user constraints.
 
     Enforces working hours, slot preferences, and per-day task limits.
