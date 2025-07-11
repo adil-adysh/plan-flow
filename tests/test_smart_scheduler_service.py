@@ -1,6 +1,7 @@
 """Unit tests for SmartSchedulerService in PlanFlow.
 
-Covers scheduling, missed task detection, retry, recurrence, pause/resume, and slot validation.
+Covers scheduling, missed task detection, retry, recurrence, pause/resume, slot validation,
+timer lifecycle, and edge cases like empty recovery or fallback to recurrence.
 """
 
 import threading
@@ -17,6 +18,7 @@ from addon.globalPlugins.planflow.task.task_model import (
     TaskExecution,
 )
 
+
 # --- Fixtures ---
 
 
@@ -31,17 +33,6 @@ def sample_occ(now_fn: Callable[[], datetime]) -> TaskOccurrence:
         id="occ-1",
         task_id="task-1",
         scheduled_for=now_fn() + timedelta(minutes=5),
-        slot_name=None,
-        pinned_time=None,
-    )
-
-
-@pytest.fixture
-def executed_occ(now_fn: Callable[[], datetime]) -> TaskOccurrence:
-    return TaskOccurrence(
-        id="occ-2",
-        task_id="task-2",
-        scheduled_for=now_fn() - timedelta(minutes=10),
         slot_name=None,
         pinned_time=None,
     )
@@ -90,7 +81,7 @@ def service(
     )
 
 
-# --- Test Cases ---
+# --- Core Tests ---
 
 
 def test_task_due_immediately(
@@ -105,20 +96,20 @@ def test_task_due_immediately(
         slot_name=sample_occ.slot_name,
         pinned_time=sample_occ.pinned_time,
     )
-    service._on_trigger = MagicMock()
+    service._on_trigger = MagicMock()  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
     service.schedule_occurrence(occ)
-    service._on_trigger.assert_called_once_with(occ)
+    service._on_trigger.assert_called_once_with(occ)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
 
 
 def test_future_task_scheduled(
     service: SmartSchedulerService,
     sample_occ: TaskOccurrence,
 ) -> None:
-    service._on_trigger = MagicMock()
+    service._on_trigger = MagicMock()  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
     service.schedule_occurrence(sample_occ)
-    assert sample_occ.id in service._timers
-    assert isinstance(service._timers[sample_occ.id], threading.Timer)
-    assert service._timers[sample_occ.id].daemon is True
+    assert sample_occ.id in service._timers  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+    assert isinstance(service._timers[sample_occ.id], threading.Timer)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+    assert service._timers[sample_occ.id].daemon is True  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
 
 
 def test_task_already_executed(
@@ -130,7 +121,7 @@ def test_task_already_executed(
         TaskExecution(occurrence_id=sample_occ.id, state="done", retries_remaining=0)
     ]
     service.schedule_occurrence(sample_occ)
-    assert sample_occ.id not in service._timers
+    assert sample_occ.id not in service._timers  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
 
 
 def test_slot_invalid_skipped(
@@ -140,7 +131,7 @@ def test_slot_invalid_skipped(
 ) -> None:
     calendar.is_slot_available.return_value = False
     service.schedule_occurrence(sample_occ)
-    assert sample_occ.id not in service._timers
+    assert sample_occ.id not in service._timers  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
 
 
 def test_task_missed_within_grace(
@@ -158,9 +149,9 @@ def test_task_missed_within_grace(
     )
     execution_repo.list_occurrences.return_value = [occ]
     execution_repo.list_executions.return_value = []
-    service._on_trigger = MagicMock()
+    service._on_trigger = MagicMock()  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
     service.check_for_missed_tasks()
-    service._on_trigger.assert_called_once_with(occ)
+    service._on_trigger.assert_called_once_with(occ)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
 
 
 def test_task_missed_beyond_grace(
@@ -178,9 +169,9 @@ def test_task_missed_beyond_grace(
     )
     execution_repo.list_occurrences.return_value = [occ]
     execution_repo.list_executions.return_value = []
-    service._trigger_recovery = MagicMock()
+    service._trigger_recovery = MagicMock()  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
     service.check_for_missed_tasks()
-    service._trigger_recovery.assert_called_once_with(occ)
+    service._trigger_recovery.assert_called_once_with(occ)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
 
 
 def test_retry_schedules_new_occurrence(
@@ -189,8 +180,6 @@ def test_retry_schedules_new_occurrence(
     scheduler: MagicMock,
     execution_repo: MagicMock,
 ) -> None:
-    policy = RetryPolicy(max_retries=1)
-
     retry_occ = TaskOccurrence(
         id="occ-retry",
         task_id=sample_occ.task_id,
@@ -208,11 +197,11 @@ def test_retry_schedules_new_occurrence(
         recurrence=None,
         preferred_slots=[],
         priority="medium",
-        retry_policy=policy,
+        retry_policy=RetryPolicy(max_retries=1),
         pinned_time=None,
     )
     service.schedule_occurrence = MagicMock()
-    service._on_trigger(sample_occ)
+    service._on_trigger(sample_occ)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
     service.schedule_occurrence.assert_called_with(retry_occ)
 
 
@@ -223,15 +212,13 @@ def test_recurrence_schedules_new_occurrence(
     execution_repo: MagicMock,
 ) -> None:
     scheduler.reschedule_retry.return_value = None
-    recurrence = timedelta(days=1)
-
     task = TaskDefinition(
         id=sample_occ.task_id,
         title="Test",
         description=None,
         link=None,
         created_at=datetime(2025, 1, 1, 8, 0, 0),
-        recurrence=recurrence,
+        recurrence=timedelta(days=1),
         preferred_slots=[],
         priority="medium",
         retry_policy=RetryPolicy(max_retries=1),
@@ -240,7 +227,7 @@ def test_recurrence_schedules_new_occurrence(
     execution_repo.get_task.return_value = task
     scheduler.get_next_occurrence.return_value = sample_occ
     service.schedule_occurrence = MagicMock()
-    service._on_trigger(sample_occ)
+    service._on_trigger(sample_occ)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
     service.schedule_occurrence.assert_called_with(sample_occ)
 
 
@@ -250,7 +237,7 @@ def test_pause_prevents_timers(
 ) -> None:
     service.pause()
     service.schedule_occurrence(sample_occ)
-    assert sample_occ.id not in service._timers
+    assert sample_occ.id not in service._timers  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
 
 
 def test_resume_restarts_scheduling(
@@ -262,4 +249,93 @@ def test_resume_restarts_scheduling(
     execution_repo.list_executions.return_value = []
     service.pause()
     service.start()
-    assert sample_occ.id in service._timers
+    assert sample_occ.id in service._timers  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+
+
+# --- Additional Coverage Tests ---
+
+
+def test_rescheduling_occurrence_cancels_previous_timer(
+    service: SmartSchedulerService,
+    sample_occ: TaskOccurrence,
+) -> None:
+    service.schedule_occurrence(sample_occ)
+    original_timer = service._timers[sample_occ.id]  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+    service.schedule_occurrence(sample_occ)
+    new_timer = service._timers[sample_occ.id]  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+    assert original_timer != new_timer
+    assert not original_timer.is_alive()
+
+
+def test_missed_task_check_skipped_when_paused(
+    service: SmartSchedulerService,
+    execution_repo: MagicMock,
+    sample_occ: TaskOccurrence,
+    now_fn: Callable[[], datetime],
+) -> None:
+    occ = TaskOccurrence(
+        id=sample_occ.id,
+        task_id=sample_occ.task_id,
+        scheduled_for=now_fn() - timedelta(seconds=60),
+        slot_name=None,
+        pinned_time=None,
+    )
+    execution_repo.list_occurrences.return_value = [occ]
+    execution_repo.list_executions.return_value = []
+    service._trigger_recovery = MagicMock()  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+    service.pause()
+    service.check_for_missed_tasks()
+    service._trigger_recovery.assert_not_called()  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+
+
+def test_retry_none_falls_back_to_recurrence(
+    service: SmartSchedulerService,
+    sample_occ: TaskOccurrence,
+    scheduler: MagicMock,
+    execution_repo: MagicMock,
+) -> None:
+    scheduler.reschedule_retry.return_value = None
+    next_occ = TaskOccurrence(
+        id="next-occ",
+        task_id=sample_occ.task_id,
+        scheduled_for=sample_occ.scheduled_for + timedelta(days=1),
+        slot_name=None,
+        pinned_time=None,
+    )
+    scheduler.get_next_occurrence.return_value = next_occ
+    execution_repo.get_task.return_value = TaskDefinition(
+        id=sample_occ.task_id,
+        title="Task",
+        description=None,
+        link=None,
+        created_at=datetime(2025, 1, 1, 8, 0, 0),
+        recurrence=timedelta(days=1),
+        preferred_slots=[],
+        priority="medium",
+        retry_policy=RetryPolicy(max_retries=1),
+        pinned_time=None,
+    )
+    service.schedule_occurrence = MagicMock()
+    service._on_trigger(sample_occ)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+    service.schedule_occurrence.assert_called_with(next_occ)
+
+
+def test_trigger_recovery_with_no_new_occurrences(
+    service: SmartSchedulerService,
+    recovery: MagicMock,
+    sample_occ: TaskOccurrence,
+) -> None:
+    recovery.recover_missed_occurrences.return_value = []
+    service.schedule_occurrence = MagicMock()
+    service._trigger_recovery(sample_occ)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+    service.schedule_occurrence.assert_not_called()
+
+
+def test_pause_clears_all_timers(
+    service: SmartSchedulerService,
+    sample_occ: TaskOccurrence,
+) -> None:
+    service.schedule_occurrence(sample_occ)
+    assert len(service._timers) > 0  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+    service.pause()
+    assert len(service._timers) == 0  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
