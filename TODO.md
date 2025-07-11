@@ -1,9 +1,5 @@
 
-# ✅ **PlanFlow Roadmap & TODOs (Reordered for Real-World Flow)**
-
-This is the actively maintained contributor roadmap.
-Start from top, especially if you're new. Link issues and PRs to the checklist.
-
+# ✅ PlanFlow Roadmap & TODOs 
 ---
 
 ## 🔹 MVP First Milestone: Basic NVDA Add-on with Manual Task Creation
