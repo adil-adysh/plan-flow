@@ -37,7 +37,9 @@ class ExecutionRepository:
 
     def add_execution(self, exec: TaskExecution) -> None: ...
     def list_executions(self) -> list[TaskExecution]: ...
-````
+
+    def delete_task_and_related(self, task_id: str) -> None: ...
+```
 
 ---
 
@@ -48,6 +50,7 @@ class ExecutionRepository:
 * Handle ID-based uniqueness but allow overwrites (idempotency)
 * Store timestamps as ISO strings (using `datetime.isoformat()`), not native `datetime` objects, for TinyDB compatibility
 * No logic — just persistence and retrieval
+* `delete_task_and_related` must remove the task, all related occurrences, and all executions for those occurrences (cascade delete)
 
 ---
 
@@ -62,6 +65,7 @@ class ExecutionRepository:
 
 * Return deserialized instances from JSON-compatible dicts
 * Type signatures must match return values exactly
+* `delete_task_and_related` returns `None` and removes all relevant records
 
 ---
 
@@ -84,6 +88,12 @@ Each method must include a Google-style docstring with:
 * Parameters and types
 * Return values and format
 * Any side effects (e.g. overwrite, in-place update)
+
+For `delete_task_and_related`:
+* Purpose: Remove a task and all related occurrences and executions by `task_id`.
+* Parameters: `task_id` (str): The ID of the TaskDefinition to delete.
+* Returns: None. Removes the task, its occurrences, and executions from the database.
+* Side effects: Removes all records from 'tasks', 'occurrences', and 'executions' tables related to the given `task_id`.
 
 ---
 
