@@ -33,7 +33,7 @@ PlanFlow is open source and welcomes contributions. If you’re interested in ac
 
 - **How to Contribute:**
   - Please read the `docs/task-design.md` file for the core design and architecture before contributing.
-  - Check out the code and instructions in the repository.
+  - Each test file has a corresponding `testplan.md` in the `tests/` folder, describing the test coverage and scenarios for that module. Review these to understand the test strategy and expectations.
   - See the issues list for bugs and feature requests.
   - Submit pull requests for improvements, new features, or bug fixes.
   - Help us test and document the add-on.
