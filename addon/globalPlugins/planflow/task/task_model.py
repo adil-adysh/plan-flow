@@ -137,13 +137,15 @@ class TaskExecution:
 
 @dataclass(frozen=True, slots=True)
 class TimeSlot:
-    """Represents a named time window for task delivery.
+    """Represents a uniquely identified named time window for task delivery.
 
     Attributes:
-        name (str): Name of the time slot (must match preferred_slots).
+        id (str): Unique identifier for the slot (UUID).
+        name (str): Name of the time slot (may not be unique).
         start (time): Start time of the slot.
         end (time): End time of the slot.
     """
+    id: str
     name: str
     start: time
     end: time

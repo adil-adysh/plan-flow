@@ -48,33 +48,43 @@ class DummyViewModel:
 
 def test_tree_renders_structure(app, monkeypatch):
 	from desktop_ui.tree_panel import PlannerTreePanel
-	panel = PlannerTreePanel(None, DummyViewModel())
+	frame = wx.Frame(None)
+	panel = PlannerTreePanel(frame, DummyViewModel())
 	assert panel.tree.GetCount() > 0
+	frame.Destroy()
 
 def test_task_selection_updates_detail_panel(app, monkeypatch):
 	from desktop_ui.detail_panel import TaskDetailPanel
-	panel = TaskDetailPanel(None, DummyViewModel())
+	frame = wx.Frame(None)
+	panel = TaskDetailPanel(frame, DummyViewModel())
 	panel.update_detail()
 	assert "Test Task" in panel.title.GetLabel()
+	frame.Destroy()
 
 def test_mark_done_updates_view(app, monkeypatch):
 	vm = DummyViewModel()
 	from desktop_ui.detail_panel import TaskDetailPanel
-	panel = TaskDetailPanel(None, vm)
+	frame = wx.Frame(None)
+	panel = TaskDetailPanel(frame, vm)
 	vm.mark_selected_done()
 	panel.update_detail()
 	assert "done" in panel.state.GetLabel()
+	frame.Destroy()
 
 def test_today_expands_and_scrolls(app, monkeypatch):
 	from desktop_ui.toolbar_panel import PlannerToolBar
 	vm = DummyViewModel()
-	panel = PlannerToolBar(None, vm)
+	frame = wx.Frame(None)
+	panel = PlannerToolBar(frame, vm)
 	panel.on_today(None)
 	assert vm.get_today_summary() == "Today: 1 task"
+	frame.Destroy()
 
 def test_toolbar_buttons_call_view_model(app, monkeypatch):
 	from desktop_ui.toolbar_panel import PlannerToolBar
 	vm = DummyViewModel()
-	panel = PlannerToolBar(None, vm)
+	frame = wx.Frame(None)
+	panel = PlannerToolBar(frame, vm)
 	panel.on_mark_done(None)
 	assert vm.detail.state == "done"
+	frame.Destroy()
