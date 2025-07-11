@@ -99,3 +99,39 @@ def test_empty_lists(repo: ExecutionRepository) -> None:
     assert repo.list_tasks() == []
     assert repo.list_occurrences() == []
     assert repo.list_executions() == []
+
+def test_delete_task_and_related_removes_all(repo: ExecutionRepository, sample_task: TaskDefinition, sample_occurrence: TaskOccurrence, sample_execution: TaskExecution) -> None:
+    repo.add_task(sample_task)
+    repo.add_occurrence(sample_occurrence)
+    repo.add_execution(sample_execution)
+    # Sanity check: all present
+    assert repo.get_task(sample_task.id) is not None
+    assert any(o.id == sample_occurrence.id for o in repo.list_occurrences())
+    assert any(e.occurrence_id == sample_occurrence.id for e in repo.list_executions())
+    # Delete
+    repo.delete_task_and_related(sample_task.id)
+    # All gone
+    assert repo.get_task(sample_task.id) is None
+    assert not any(o.task_id == sample_task.id for o in repo.list_occurrences())
+    assert not any(e.occurrence_id == sample_occurrence.id for e in repo.list_executions())
+
+def test_delete_task_and_related_only_affects_target(repo: ExecutionRepository, sample_task: TaskDefinition, sample_occurrence: TaskOccurrence, sample_execution: TaskExecution) -> None:
+    # Add a second unrelated task/occ/execution
+    other_task = replace(sample_task, id="t2", title="Other")
+    other_occ = replace(sample_occurrence, id="o2", task_id="t2")
+    other_exec = replace(sample_execution, occurrence_id="o2")
+    repo.add_task(sample_task)
+    repo.add_occurrence(sample_occurrence)
+    repo.add_execution(sample_execution)
+    repo.add_task(other_task)
+    repo.add_occurrence(other_occ)
+    repo.add_execution(other_exec)
+    # Delete first task
+    repo.delete_task_and_related(sample_task.id)
+    # First gone, second remains
+    assert repo.get_task(sample_task.id) is None
+    assert repo.get_task("t2") is not None
+    assert not any(o.task_id == sample_task.id for o in repo.list_occurrences())
+    assert any(o.task_id == "t2" for o in repo.list_occurrences())
+    assert not any(e.occurrence_id == sample_occurrence.id for e in repo.list_executions())
+    assert any(e.occurrence_id == "o2" for e in repo.list_executions())

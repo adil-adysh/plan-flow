@@ -6,15 +6,12 @@ TaskDefinition, TaskOccurrence, and TaskExecution records. Supports pluggable st
 """
 
 from __future__ import annotations
-from typing import TYPE_CHECKING
-from dataclasses import asdict, is_dataclass
-from tinydb import TinyDB
+from tinydb import TinyDB, where
 from tinydb.storages import MemoryStorage
 from tinydb.table import Table
 from .task_model import TaskDefinition, TaskOccurrence, TaskExecution, RetryPolicy, TaskEvent
 from datetime import datetime, timedelta
 import typing as t
-import copy
 def _serialize_datetime(dt: datetime) -> str:
     return dt.isoformat()
 
@@ -131,9 +128,9 @@ class ExecutionRepository:
             db: Optional TinyDB instance. If None, uses in-memory storage.
         """
         self._db: TinyDB = db if db is not None else TinyDB(storage=MemoryStorage)
-        self._tasks: Table = self._db.table("tasks")
-        self._occurrences: Table = self._db.table("occurrences")
-        self._executions: Table = self._db.table("executions")
+        self._tasks: Table = self._db.table("tasks")  # type: ignore
+        self._occurrences: Table = self._db.table("occurrences")  # type: ignore
+        self._executions: Table = self._db.table("executions")  # type: ignore
 
     def add_task(self, task: TaskDefinition) -> None:
         """Store a new task definition.
@@ -196,3 +193,32 @@ class ExecutionRepository:
             A list of all TaskExecution records.
         """
         return [_deserialize_task_execution(d) for d in self._executions.all()]
+
+    def delete_task_and_related(self, task_id: str) -> None:
+        """Delete a task and all related occurrences and executions by task_id.
+
+        Args:
+            task_id: The ID of the TaskDefinition to delete.
+
+        Returns:
+            None. Removes the task, its occurrences, and executions from the database.
+
+        Side effects:
+            Removes all records from 'tasks', 'occurrences', and 'executions' tables related to the given task_id.
+        """
+        tasks_table: Table = self._db.table("tasks")  # type: ignore
+        occurrences_table: Table = self._db.table("occurrences")  # type: ignore
+        executions_table: Table = self._db.table("executions")  # type: ignore
+
+        # Delete the task
+        _ = tasks_table.remove(where("id") == task_id)
+
+        # Find all occurrence ids for this task
+        occurrence_ids: list[str] = [o["id"] for o in occurrences_table.search(where("task_id") == task_id)]
+
+        # Delete occurrences
+        _ = occurrences_table.remove(where("task_id") == task_id)
+
+        # Delete executions for these occurrences
+        for occ_id in occurrence_ids:
+            _ = executions_table.remove(where("occurrence_id") == occ_id)
