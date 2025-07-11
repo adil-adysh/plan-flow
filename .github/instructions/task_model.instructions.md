@@ -21,19 +21,21 @@ This module defines the **core data models** used by the PlanFlow task scheduler
 
 ## 📦 Data Models to Implement
 
+
 ### ✅ `TaskDefinition`
 
 Represents a user-defined task.
 
 - `id: str`
 - `title: str`
-- `description: Optional[str]`
-- `link: Optional[str]` — local file or URL
+- `description: str | None`
+- `link: str | None` — local file or URL
 - `created_at: datetime`
-- `recurrence: Optional[timedelta]`
+- `recurrence: timedelta | None`
 - `priority: Literal["low", "medium", "high"]`
 - `preferred_slots: list[str]` — names of `TimeSlot`s the task prefers
 - `retry_policy: RetryPolicy`
+- `pinned_time: datetime | None = None` — user-requested exact datetime for scheduling
 
 ---
 

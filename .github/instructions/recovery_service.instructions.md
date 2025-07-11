@@ -46,7 +46,9 @@ class RecoveryService:
         max_per_day: int
     ) -> list[TaskOccurrence]:
         """Return new retry or recurrence occurrences for missed tasks.
-        
+
+        When calling TaskScheduler.reschedule_retry, pass the retries_remaining parameter as required by the implementation.
+
         Occurrences with `pinned_time` are treated as user-fixed and 
         excluded from recovery retry/reschedule logic.
         """

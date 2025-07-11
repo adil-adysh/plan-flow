@@ -46,7 +46,7 @@ class ExecutionRepository:
 * Use `TinyDB` with `.table("tasks")`, `.table("occurrences")`, `.table("executions")`
 * Store only `@dataclass` values converted via `asdict()`
 * Handle ID-based uniqueness but allow overwrites (idempotency)
-* Store timestamps as `datetime`, not strings
+* Store timestamps as ISO strings (using `datetime.isoformat()`), not native `datetime` objects, for TinyDB compatibility
 * No logic — just persistence and retrieval
 
 ---

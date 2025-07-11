@@ -54,8 +54,8 @@ class TaskScheduler:
         max_per_day: int
     ) -> Optional[TaskOccurrence]:
         """Generate the next recurrence occurrence for this task.
-        
-        If the task includes a valid `pinned_time`, return an occurrence
+
+        If the task includes a valid `pinned_time` attribute (on TaskDefinition), return an occurrence
         for that time. If the pinned time is invalid or missing, use 
         recurrence rules and calendar logic to select the next slot.
         """
@@ -69,9 +69,13 @@ class TaskScheduler:
         scheduled_occurrences: list[TaskOccurrence],
         working_hours: list[WorkingHours],
         slot_pool: list[TimeSlot],
-        max_per_day: int
+        max_per_day: int,
+        retries_remaining: int | None = None
     ) -> Optional[TaskOccurrence]:
-        """Generate a retry occurrence based on retry policy and availability."""
+        """Generate a retry occurrence based on retry policy and availability.
+
+        The implementation requires a retries_remaining parameter to enforce retry limits.
+        """
 ````
 
 ---

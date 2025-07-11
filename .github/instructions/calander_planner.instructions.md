@@ -38,9 +38,24 @@ class CalendarPlanner:
         proposed_time: datetime,
         scheduled_occurrences: list[TaskOccurrence],
         working_hours: list[WorkingHours],
-        max_per_day: int
+        max_per_day: int,
+        slot_pool: list[TimeSlot] | None = None
     ) -> bool:
-        """Check if a new task can be scheduled at the proposed time."""
+        """Check if a new task can be scheduled at the proposed time.
+
+        Args:
+            proposed_time: The datetime to test availability for.
+            scheduled_occurrences: List of already scheduled TaskOccurrence.
+            working_hours: List of WorkingHours objects for allowed scheduling per weekday.
+            max_per_day: Maximum allowed tasks per calendar day.
+            slot_pool: Optional list of allowed TimeSlot objects (user preferences). If None, slot-based constraints are skipped.
+
+        Returns:
+            True if the slot is available (within working hours, not exceeding per-day cap, not colliding with existing tasks, and matches allowed slots if specified), else False.
+
+        Fallback:
+            Returns False if the day is not in working_hours or slot is not allowed.
+        """
 
     def next_available_slot(
         self,
@@ -105,10 +120,11 @@ User-defined preferred times, such as:
 
 ## 📚 Requirements
 
+
 ### Inputs
 
 * `after`: datetime to search after
-* `slot_pool`: allowed user slot times
+* `slot_pool`: allowed user slot times (may be None for is_slot_available)
 * `working_hours`: allowed hours per weekday
 * `scheduled_occurrences`: already scheduled task times
 * `max_per_day`: how many tasks allowed per day
