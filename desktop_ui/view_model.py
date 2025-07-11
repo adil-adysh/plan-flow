@@ -1,7 +1,7 @@
 """Adapter between controller and UI for PlanFlow desktop UI."""
 
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, time
 from typing import Literal
 
 @dataclass(frozen=True, slots=True)
@@ -34,6 +34,57 @@ from datetime import datetime
 from typing import Any
 
 class DesktopViewModel:
+	def add_task_to_slot(self, day_label: str, slot_name: str, title: str) -> None:
+		"""Add a new task occurrence to the given slot and day with the provided title."""
+		from addon.globalPlugins.planflow.task.task_model import TaskDefinition, TaskOccurrence, RetryPolicy
+		from datetime import datetime, timedelta
+		# For demo, create a new TaskDefinition and TaskOccurrence
+		new_task_id = f"task-{datetime.now().timestamp()}"
+		new_occ_id = f"occ-{datetime.now().timestamp()}"
+		task = TaskDefinition(
+			id=new_task_id,
+			title=title,
+			description=None,
+			link=None,
+			created_at=datetime.now(),
+			recurrence=None,
+			priority="medium",
+			preferred_slots=[slot_name],
+			retry_policy=RetryPolicy(max_retries=1),
+			pinned_time=None
+		)
+		self.repo.add_task(task)
+		# Use today's date for scheduled_for, or parse from day_label if needed
+		try:
+			# Try to parse day_label as day number
+			day_num = int(day_label)
+			scheduled_for = datetime.now().replace(day=day_num, hour=8, minute=0, second=0, microsecond=0)
+		except Exception:
+			scheduled_for = datetime.now()
+		occ = TaskOccurrence(
+			id=new_occ_id,
+			task_id=new_task_id,
+			scheduled_for=scheduled_for,
+			slot_name=slot_name,
+			pinned_time=None
+		)
+		self.repo.add_occurrence(occ)
+	def add_slot(self, day_id: str, name: str, start: time, end: time) -> None:
+		"""Add a slot to the given day and persist it in memory."""
+		if not hasattr(self, '_slots_by_day'):
+			self._slots_by_day = {}
+		if day_id not in self._slots_by_day:
+			self._slots_by_day[day_id] = []
+		# Prevent duplicate slot names for the same day
+		if any(slot['name'] == name for slot in self._slots_by_day[day_id]):
+			return
+		self._slots_by_day[day_id].append({'name': name, 'start': start, 'end': end})
+
+	def get_slot_name_from_id(self, slot_id: str) -> str | None:
+		"""Extract slot name from slot_id string."""
+		if ':slot:' in slot_id:
+			return slot_id.split(':slot:')[-1]
+		return None
 	"""Adapter between controller and UI for PlanFlow desktop UI."""
 
 	def __init__(self) -> None:
@@ -90,8 +141,7 @@ class DesktopViewModel:
 		self.selected_occ_id = "demo-occ-1"
 
 	def refresh_tree(self) -> TreeNode:
-		"""Return the root TreeNode for the planner tree."""
-		# Group by month/week/day/task for demo
+		"""Return the root TreeNode for the planner tree, with slots under each day."""
 		occs = self.repo.list_occurrences()
 		occs_by_date: dict[str, list[TaskOccurrence]] = {}
 		for occ in occs:
@@ -113,15 +163,36 @@ class DesktopViewModel:
 				for occ in days:
 					day = occ.scheduled_for.strftime("%d")
 					by_day.setdefault(day, []).append(occ)
-					# ...
 				for day, occs_in_day in by_day.items():
-					day_node = TreeNode(id=f"{month}:{week}:{day}", label=day, children=[], is_expanded=True, is_selected=False)
-					for occ in occs_in_day:
-						is_selected = occ.id == self.selected_occ_id
-						task = self.repo.get_task(occ.task_id)
-						label = task.title if task else occ.id
-						occ_node = TreeNode(id=occ.id, label=label, children=[], is_expanded=False, is_selected=is_selected)
-						day_node.children.append(occ_node)
+					day_id = f"{month}:{week}:{day}"
+					day_node = TreeNode(id=day_id, label=day, children=[], is_expanded=True, is_selected=False)
+					# Add slots for this day (use full day_id as key)
+					slots = []
+					if hasattr(self, '_slots_by_day') and day_id in self._slots_by_day:
+						slots = self._slots_by_day[day_id]
+					for slot in slots:
+						slot_id = f"{day_id}:slot:{slot['name']}"
+						# Find the first task title for this slot (if any)
+						first_task_title = None
+						for occ in occs_in_day:
+							if occ.slot_name == slot['name']:
+								task = self.repo.get_task(occ.task_id)
+								if task:
+									first_task_title = task.title
+									break
+						slot_label = f"{slot['name']} ({slot['start'].strftime('%H:%M')}-{slot['end'].strftime('%H:%M')})"
+						if first_task_title:
+							slot_label += f": {first_task_title}"
+						slot_node = TreeNode(id=slot_id, label=slot_label, children=[], is_expanded=True, is_selected=False)
+						# Attach only tasks with occ.slot_name == slot['name']
+						for occ in occs_in_day:
+							if occ.slot_name == slot['name']:
+								is_selected = occ.id == self.selected_occ_id
+								task = self.repo.get_task(occ.task_id)
+								label = task.title if task else occ.id
+								occ_node = TreeNode(id=occ.id, label=label, children=[], is_expanded=False, is_selected=is_selected)
+								slot_node.children.append(occ_node)
+						day_node.children.append(slot_node)
 					week_node.children.append(day_node)
 				month_node.children.append(week_node)
 			root.children.append(month_node)

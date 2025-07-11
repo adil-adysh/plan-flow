@@ -2,7 +2,6 @@
 
 import wx
 from .view_model import DesktopViewModel, TaskDetailView
-from datetime import datetime
 
 class TaskDetailPanel(wx.Panel):
 	"""Panel displaying details for the selected task occurrence."""
@@ -12,7 +11,7 @@ class TaskDetailPanel(wx.Panel):
 		self.title = wx.StaticText(self, label="Title:")
 		self.description = wx.TextCtrl(self, style=wx.TE_MULTILINE)
 		self.description.SetName("Task Detail Edit")
-		self.description.Enable(True)
+		self.description.SetEditable(False)  # Accessible read-only, focusable
 		self.scheduled_for = wx.StaticText(self, label="Scheduled:")
 		self.slot_name = wx.StaticText(self, label="Slot:")
 		self.recurrence = wx.StaticText(self, label="Recurrence:")
@@ -59,3 +58,6 @@ class TaskDetailPanel(wx.Panel):
 			color = wx.Colour(255, 220, 0)
 		self.state.SetForegroundColour(color)
 		self.state.Refresh()
+		# Accessibility: notify assistive tech of value change
+		if hasattr(self, "NotifyEvent"):
+			self.NotifyEvent(wx.wxEVT_ACCESSIBILITY_VALUE_CHANGE, self, wx.OBJID_CLIENT, 0)
