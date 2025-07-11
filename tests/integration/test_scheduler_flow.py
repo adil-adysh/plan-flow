@@ -116,8 +116,8 @@ def test_preferred_slot_unavailable_fallback_to_next_slot(
 ) -> None:
     """If preferred slot is full, scheduler tries next available slot."""
     slot_pool = [
-        TimeSlot(name="morning", start=datetime.strptime("09:00", "%H:%M").time(), end=datetime.strptime("12:00", "%H:%M").time()),
-        TimeSlot(name="afternoon", start=datetime.strptime("13:00", "%H:%M").time(), end=datetime.strptime("17:00", "%H:%M").time()),
+        TimeSlot(id="morning", name="morning", start=datetime.strptime("09:00", "%H:%M").time(), end=datetime.strptime("12:00", "%H:%M").time()),
+        TimeSlot(id="afternoon", name="afternoon", start=datetime.strptime("13:00", "%H:%M").time(), end=datetime.strptime("17:00", "%H:%M").time()),
     ]
     task = TaskDefinition(
         id="t-fallback",
@@ -259,7 +259,7 @@ def test_recurrence_skips_holiday_or_blocked_day(
         WorkingHours(day="wednesday", start=datetime.strptime("09:00", "%H:%M").time(), end=datetime.strptime("17:00", "%H:%M").time(), allowed_slots=["morning"]),
     ]
     slot_pool = [
-        TimeSlot(name="morning", start=datetime.strptime("09:00", "%H:%M").time(), end=datetime.strptime("12:00", "%H:%M").time()),
+        TimeSlot(id="morning", name="morning", start=datetime.strptime("09:00", "%H:%M").time(), end=datetime.strptime("12:00", "%H:%M").time()),
     ]
     # Set now to a Thursday so the next valid day is Wednesday next week
     thursday = datetime(2025, 7, 10, 8, 0, 0)  # 2025-07-10 is a Thursday
@@ -299,7 +299,7 @@ def test_partial_day_availability(
         WorkingHours(day="monday", start=datetime.strptime("10:00", "%H:%M").time(), end=datetime.strptime("11:00", "%H:%M").time(), allowed_slots=["morning"]),
     ]
     slot_pool = [
-        TimeSlot(name="morning", start=datetime.strptime("09:00", "%H:%M").time(), end=datetime.strptime("12:00", "%H:%M").time()),
+        TimeSlot(id="morning", name="morning", start=datetime.strptime("09:00", "%H:%M").time(), end=datetime.strptime("12:00", "%H:%M").time()),
     ]
     task = TaskDefinition(
         id="t-partial",
@@ -551,8 +551,8 @@ def working_hours() -> list[WorkingHours]:
 @pytest.fixture
 def slot_pool() -> list[TimeSlot]:
     return [
-        TimeSlot(name="morning", start=datetime.strptime("09:00", "%H:%M").time(), end=datetime.strptime("12:00", "%H:%M").time()),
-        TimeSlot(name="afternoon", start=datetime.strptime("13:00", "%H:%M").time(), end=datetime.strptime("17:00", "%H:%M").time()),
+        TimeSlot(id="morning", name="morning", start=datetime.strptime("09:00", "%H:%M").time(), end=datetime.strptime("12:00", "%H:%M").time()),
+        TimeSlot(id="afternoon", name="afternoon", start=datetime.strptime("13:00", "%H:%M").time(), end=datetime.strptime("17:00", "%H:%M").time()),
     ]
 
 
