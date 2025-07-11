@@ -1,3 +1,4 @@
+
 # PlanFlow: Accessible Task Scheduling for NVDA (In Development)
 
 **PlanFlow** is an NVDA add-on designed to help you schedule, track, and manage your daily tasks in an accessible way. The project is under active development—some features are available now, and many more are planned.
@@ -29,10 +30,20 @@
 
 ## For Developers: Get Involved!
 
+
 PlanFlow is open source and welcomes contributions. If you’re interested in accessible technology, task management, or NVDA add-ons, we’d love your help!
 
-- **How to Contribute:**
-  - Please read the `docs/task-design.md` file for the core design and architecture before contributing.
+## 📚 Documentation
+
+- [Task Design](docs/task-design.md): Core scheduling and model concepts
+- [TODOs](TODO.md): Current priorities, open tasks, and ideas
+- [Test Plans](tests/): Test coverage and scenarios
+- [Instructions](.github/instructions/): Module-level implementation rules
+
+
+**How to Contribute:**
+  - Please read the [Task Design](docs/task-design.md) for the core design and architecture before contributing.
+  - Review the [TODOs](TODO.md) for current priorities and open tasks.
   - Each test file has a corresponding `testplan.md` in the `tests/` folder, describing the test coverage and scenarios for that module. Review these to understand the test strategy and expectations.
   - See the issues list for bugs and feature requests.
   - Submit pull requests for improvements, new features, or bug fixes.
