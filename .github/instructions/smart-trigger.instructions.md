@@ -152,12 +152,10 @@ self._lock: threading.RLock = threading.RLock()
 
    ```python
    exec = TaskExecution(
-       id=generate_id(),
-       task_id=occ.task_id,
        occurrence_id=occ.id,
-       scheduled_for=occ.scheduled_for,
-       actual_run=datetime.now(),
        state="done",
+       retries_remaining=0,
+       history=[],
    )
    self._execution_repo.add_execution(exec)
    ```
