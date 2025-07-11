@@ -18,8 +18,8 @@ def sample_working_hours() -> list[WorkingHours]:
 @pytest.fixture
 def sample_slot_pool() -> list[TimeSlot]:
     return [
-        TimeSlot(name="morning", start=time(9, 0), end=time(12, 0)),
-        TimeSlot(name="afternoon", start=time(13, 0), end=time(17, 0)),
+        TimeSlot(id="morning", name="morning", start=time(9, 0), end=time(12, 0)),
+        TimeSlot(id="afternoon", name="afternoon", start=time(13, 0), end=time(17, 0)),
     ]
 
 @pytest.fixture

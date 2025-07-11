@@ -120,7 +120,7 @@ def test_task_execution_reschedulable_logic():
     assert exec_no_retries.is_reschedulable is False
 
 def test_time_slot_fields():
-    slot = TimeSlot(name="morning", start=time(8, 0), end=time(12, 0))
+    slot = TimeSlot(id="morning", name="morning", start=time(8, 0), end=time(12, 0))
     assert slot.name == "morning"
     assert slot.start == time(8, 0)
     assert slot.end == time(12, 0)

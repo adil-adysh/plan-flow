@@ -80,11 +80,17 @@ def mdTool(env):
 
 
 def run_pytest(args=None):
+    import glob as _glob
     env_vars = os.environ.copy()
     env_vars["PYTHONPATH"] = "."
     cmd = [sys.executable, "-m", "pytest"]
     if args:
-        cmd.extend(args)
+        # If the first arg is 'tests/*.py', expand it
+        if len(args) == 1 and args[0] == "tests/*.py":
+            files = _glob.glob("tests/*.py")
+            cmd.extend(files)
+        else:
+            cmd.extend(args)
     return subprocess.call(cmd, env=env_vars)
 
 
@@ -106,7 +112,7 @@ env = Environment(variables=vars, ENV=os.environ, tools=["gettexttool", mdTool])
 env.Append(**buildVars.addon_info)
 
 env.Alias("test", env.Command("pytest-all", [], lambda target, source, env: run_pytest()))
-env.Alias("test_unit", env.Command("pytest-unit", [], lambda target, source, env: run_pytest(["tests", "--ignore=tests/integration"])))
+env.Alias("test_unit", env.Command("pytest-unit", [], lambda target, source, env: run_pytest(["tests/*.py"])))
 env.Alias("test_integration", env.Command("pytest-integration", [], lambda target, source, env: run_pytest(["tests/integration"])))
 env.Alias("test_desktop_ui", env.Command("pytest-desktop-ui", [], lambda target, source, env: run_pytest(["tests/desktop_ui"])))
 

@@ -17,7 +17,7 @@ def wh(day: Literal["monday", "tuesday", "wednesday", "thursday", "friday", "sat
     return WorkingHours(day=day, start=start, end=end, allowed_slots=list(allowed_slots))
 
 def ts(name: str, start: time, end: time) -> TimeSlot:
-    return TimeSlot(name=name, start=start, end=end)
+    return TimeSlot(id=name, name=name, start=start, end=end)
 
 @pytest.fixture
 def planner() -> CalendarPlanner:

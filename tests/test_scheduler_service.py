@@ -30,8 +30,8 @@ def working_hours() -> list[WorkingHours]:
 @pytest.fixture
 def slot_pool() -> list[TimeSlot]:
     return [
-        TimeSlot(name="morning", start=time(8, 0), end=time(12, 0)),
-        TimeSlot(name="afternoon", start=time(13, 0), end=time(17, 0)),
+        TimeSlot(id="morning", name="morning", start=time(8, 0), end=time(12, 0)),
+        TimeSlot(id="afternoon", name="afternoon", start=time(13, 0), end=time(17, 0)),
     ]
 
 @pytest.fixture
@@ -248,8 +248,8 @@ def test_reschedule_retry_with_retry_interval(
     policy = CustomPolicy(max_retries=2)
     # Adjust slot_pool and working_hours so a slot exists at or after now + retry_interval (12:00)
     slot_pool = [
-        TimeSlot(name="noon", start=time(12, 0), end=time(13, 0)),
-        TimeSlot(name="afternoon", start=time(15, 0), end=time(16, 0)),
+        TimeSlot(id="noon", name="noon", start=time(12, 0), end=time(13, 0)),
+        TimeSlot(id="afternoon", name="afternoon", start=time(15, 0), end=time(16, 0)),
     ]
     working_hours = [
         WorkingHours(day="thursday", start=time(8, 0), end=time(17, 0), allowed_slots=["noon", "afternoon"]),
